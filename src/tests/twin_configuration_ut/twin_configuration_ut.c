@@ -19,6 +19,7 @@
 #include "local_config.h"
 #include "twin_configuration_event_collectors.h"
 #include "twin_configuration_utils.h"
+#include "logger.h"
 #undef ENABLE_MOCKS
 
 static const LOCK_HANDLE TEST_LOCK_HANDLE = (LOCK_HANDLE)0x4443;
@@ -29,7 +30,6 @@ static const char* DUMMY_STRING = "dummy";
 static int dummyTime = 10000;
 
 #include "twin_configuration.h"
-#include "logger.h"
 #include "consts.h"
 
 static TEST_MUTEX_HANDLE test_serialize_mutex;
@@ -76,6 +76,8 @@ JsonWriterResult Mocked_JsonObjectWriter_Init(JsonObjectWriterHandle* handle) {
 static void ValidateDefaultTwinConfigurationParameters() {
     int result;
     unsigned int num;
+    bool boolean;
+    char* str;
 
     result = TwinConfiguration_GetMaxLocalCacheSize(&num);
     ASSERT_ARE_EQUAL(int, TWIN_OK, result);
@@ -96,16 +98,40 @@ static void ValidateDefaultTwinConfigurationParameters() {
     result = TwinConfiguration_GetSnapshotFrequency(&num);
     ASSERT_ARE_EQUAL(int, TWIN_OK, result);
     ASSERT_ARE_EQUAL(int, DEFAULT_SNAPSHOT_FREQUENCY, num);
+
+    result = TwinConfiguration_GetBaselineCustomChecksEnabled(&boolean);
+    ASSERT_ARE_EQUAL(int, TWIN_OK, result);
+    ASSERT_ARE_EQUAL(int, DEFAULT_BASELINE_CUSTOM_CHECKS_ENABLED, boolean);
+
+    result = TwinConfiguration_GetBaselineCustomChecksFilePath(&str);
+    ASSERT_ARE_EQUAL(int, TWIN_OK, result);
+    ASSERT_ARE_EQUAL(char_ptr, DEFAULT_BASELINE_CUSTOM_CHECKS_FILE_PATH, str);
+
+    result = TwinConfiguration_GetBaselineCustomChecksFileHash(&str);
+    ASSERT_ARE_EQUAL(int, TWIN_OK, result);
+    ASSERT_ARE_EQUAL(char_ptr, DEFAULT_BASELINE_CUSTOM_CHECKS_FILE_HASH, str);
 }
 
 /**
  * @brief Validates the regular update flows, injection of several errors is supported.
  * 
- * @param   bisCompleteuffer                whether the update is complete or partial.
- * @param   injectUnlockError               injecting a lock error on Unlock.
+ * @param   isComplete          whether the update is complete or partial.
+ * @param   injectUnlockError   injecting a lock error on Unlock.
  *
  */
 static void ValidateTwinConfigurationUpdate(bool isComplete, bool injectUnlockError) {
+    const uint32_t mockMaxLocalCacheSize = 11;
+    const uint32_t mockMaxMessageSize = 13;
+    const uint32_t mockHighPriorityMessageFrequency = 15;
+    const uint32_t mockLowPriorityMessageFrequency = 17;
+    const uint32_t mockSnapshotFrequency = 19;
+    const bool mockBaselineCustomChecksEnabled = true;
+    const char* mockBaselineCustomChecksFilePath = "/file/path";
+    const char* mockBaselineCustomChecksFileHash = "#filehash!";
+
+    TwinConfigurationResult result, expectedResult = TWIN_OK;
+
+
     STRICT_EXPECTED_CALL(JsonObjectReader_InitFromString(IGNORED_PTR_ARG, DUMMY_STRING));
 
     if (isComplete) {
@@ -113,13 +139,16 @@ static void ValidateTwinConfigurationUpdate(bool isComplete, bool injectUnlockEr
     }
 
     STRICT_EXPECTED_CALL(JsonObjectReader_StepIn(mockedReader, IGNORED_PTR_ARG));
-    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationUintValueFromJson(mockedReader, MAX_LOCAL_CACHE_SIZE_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_OK);
-    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationUintValueFromJson(mockedReader, MAX_MESSAGE_SIZE_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_OK);
-    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationTimeValueFromJson(mockedReader, HIGH_PRIORITY_MESSAGE_FREQUENCY_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_OK);
-    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationTimeValueFromJson(mockedReader, LOW_PRIORITY_MESSAGE_FREQUENCY_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_OK);
-    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationTimeValueFromJson(mockedReader, SNAPSHOT_FREQUENCY_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_OK);
+    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationUintValueFromJson(mockedReader, MAX_LOCAL_CACHE_SIZE_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_OK).CopyOutArgumentBuffer_value(&mockMaxLocalCacheSize, sizeof(mockMaxLocalCacheSize));
+    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationUintValueFromJson(mockedReader, MAX_MESSAGE_SIZE_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_OK).CopyOutArgumentBuffer_value(&mockMaxMessageSize, sizeof(mockMaxMessageSize));
+    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationTimeValueFromJson(mockedReader, HIGH_PRIORITY_MESSAGE_FREQUENCY_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_OK).CopyOutArgumentBuffer_value(&mockHighPriorityMessageFrequency, sizeof(mockHighPriorityMessageFrequency));
+    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationTimeValueFromJson(mockedReader, LOW_PRIORITY_MESSAGE_FREQUENCY_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_OK).CopyOutArgumentBuffer_value(&mockLowPriorityMessageFrequency, sizeof(mockLowPriorityMessageFrequency));
+    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationTimeValueFromJson(mockedReader, SNAPSHOT_FREQUENCY_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_OK).CopyOutArgumentBuffer_value(&mockSnapshotFrequency, sizeof(mockSnapshotFrequency));
 
-    int expectedUpdateResult = TWIN_OK;
+    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationBoolValueFromJson(mockedReader, BASELINE_CUSTOM_CHECKS_ENABLED_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_OK).CopyOutArgumentBuffer_value(&mockBaselineCustomChecksEnabled, sizeof(mockBaselineCustomChecksEnabled));
+    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationStringValueFromJson(mockedReader, BASELINE_CUSTOM_CHECKS_FILE_PATH_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_OK).CopyOutArgumentBuffer_value(&mockBaselineCustomChecksFilePath, sizeof(mockBaselineCustomChecksFilePath));
+    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationStringValueFromJson(mockedReader, BASELINE_CUSTOM_CHECKS_FILE_HASH_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_OK).CopyOutArgumentBuffer_value(&mockBaselineCustomChecksFileHash, sizeof(mockBaselineCustomChecksFileHash));
+
     STRICT_EXPECTED_CALL(Lock(IGNORED_PTR_ARG));
     STRICT_EXPECTED_CALL(TwinConfigurationEventCollectors_Update(IGNORED_PTR_ARG)).SetReturn(TWIN_OK);
     STRICT_EXPECTED_CALL(TimeUtils_GetCurrentTime()).SetReturn(dummyTime);
@@ -127,7 +156,7 @@ static void ValidateTwinConfigurationUpdate(bool isComplete, bool injectUnlockEr
 
 
     if (injectUnlockError) {
-        expectedUpdateResult = TWIN_LOCK_EXCEPTION;
+        expectedResult = TWIN_LOCK_EXCEPTION;
         STRICT_EXPECTED_CALL(Unlock(IGNORED_PTR_ARG)).SetReturn(LOCK_ERROR);
     }
     else {
@@ -135,19 +164,56 @@ static void ValidateTwinConfigurationUpdate(bool isComplete, bool injectUnlockEr
     }
 
     //act
-    int result = TwinConfiguration_Update(DUMMY_STRING, isComplete);
+    result = TwinConfiguration_Update(DUMMY_STRING, isComplete);
 
     //assert
-    ASSERT_ARE_EQUAL(int, expectedUpdateResult, result);
-    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+    ASSERT_ARE_EQUAL(int, expectedResult, result);
+
+    uint32_t maxLocalCacheSize;
+    result = TwinConfiguration_GetMaxLocalCacheSize(&maxLocalCacheSize);
+    ASSERT_ARE_EQUAL(int, TWIN_OK, result);
+    ASSERT_ARE_EQUAL(int, mockMaxLocalCacheSize, maxLocalCacheSize);
+
+    uint32_t maxMessageSize;
+    result = TwinConfiguration_GetMaxMessageSize(&maxMessageSize);
+    ASSERT_ARE_EQUAL(int, TWIN_OK, result);
+    ASSERT_ARE_EQUAL(int, mockMaxMessageSize, maxMessageSize);
+
+    uint32_t highPriorityMessageFrequency;
+    result = TwinConfiguration_GetHighPriorityMessageFrequency(&highPriorityMessageFrequency);
+    ASSERT_ARE_EQUAL(int, TWIN_OK, result);
+    ASSERT_ARE_EQUAL(int, mockHighPriorityMessageFrequency, highPriorityMessageFrequency);
+
+    uint32_t lowPriorityMessageFrequency;
+    result = TwinConfiguration_GetLowPriorityMessageFrequency(&lowPriorityMessageFrequency);
+    ASSERT_ARE_EQUAL(int, TWIN_OK, result);
+    ASSERT_ARE_EQUAL(int, mockLowPriorityMessageFrequency, lowPriorityMessageFrequency);
+
+    uint32_t snapshotFrequency;
+    result = TwinConfiguration_GetSnapshotFrequency(&snapshotFrequency);
+    ASSERT_ARE_EQUAL(int, TWIN_OK, result);
+    ASSERT_ARE_EQUAL(int, mockSnapshotFrequency, snapshotFrequency);
+
+    bool baseLineCustomChecksEnabled;
+    result = TwinConfiguration_GetBaselineCustomChecksEnabled(&baseLineCustomChecksEnabled);
+    ASSERT_ARE_EQUAL(int, TWIN_OK, result);
+    ASSERT_ARE_EQUAL(int, mockBaselineCustomChecksEnabled, baseLineCustomChecksEnabled);
+
+    char* baseLineCustomChecksFilePath;
+    result = TwinConfiguration_GetBaselineCustomChecksFilePath(&baseLineCustomChecksFilePath);
+    ASSERT_ARE_EQUAL(int, TWIN_OK, result);
+    ASSERT_ARE_EQUAL(char_ptr, mockBaselineCustomChecksFilePath, baseLineCustomChecksFilePath);
+
+    char* baseLineCustomChecksFileHash;
+    result = TwinConfiguration_GetBaselineCustomChecksFileHash(&baseLineCustomChecksFileHash);
+    ASSERT_ARE_EQUAL(int, TWIN_OK, result);
+    ASSERT_ARE_EQUAL(char_ptr, mockBaselineCustomChecksFileHash, baseLineCustomChecksFileHash);
 }
 
 BEGIN_TEST_SUITE(twin_configuration_ut)
 
 TEST_SUITE_INITIALIZE(suite_init)
 {
-     
-
     test_serialize_mutex = TEST_MUTEX_CREATE();
     ASSERT_IS_NOT_NULL(test_serialize_mutex);
 
@@ -189,13 +255,12 @@ TEST_SUITE_CLEANUP(suite_cleanup)
 
     umock_c_deinit();
     TEST_MUTEX_DESTROY(test_serialize_mutex);
-     
 }
 
 TEST_FUNCTION_INITIALIZE(method_init)
 {
     // arrange
-    int result = TwinConfiguration_Init();
+    TwinConfigurationResult result = TwinConfiguration_Init();
     ASSERT_ARE_EQUAL(int, TWIN_OK, result);
     umock_c_reset_all_calls();
 }
@@ -216,11 +281,14 @@ TEST_FUNCTION(TwinConfiguration_Init_ExpectSuccess)
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 
     ValidateDefaultTwinConfigurationParameters();
+    
 }
 
 TEST_FUNCTION(TwinConfiguration_Init_LockFailed_ExpectFailure)
 {
     STRICT_EXPECTED_CALL(Lock_Init()).SetReturn(NULL);
+    STRICT_EXPECTED_CALL(TwinConfigurationEventCollectors_Deinit());
+
     int result = TwinConfiguration_Init();
     
     ASSERT_ARE_EQUAL(int, TWIN_LOCK_EXCEPTION, result);
@@ -235,6 +303,7 @@ TEST_FUNCTION(TwinConfiguration_Init_InitEventPrioritiesFailed_ExpectFailure)
     STRICT_EXPECTED_CALL(LocalConfiguration_GetRemoteConfigurationObjectName()).SetReturn("conf");
     STRICT_EXPECTED_CALL(TwinConfigurationEventCollectors_Init()).SetReturn(TWIN_EXCEPTION);
     STRICT_EXPECTED_CALL(Lock_Deinit(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(TwinConfigurationEventCollectors_Deinit());
     
     int result = TwinConfiguration_Init();
     ASSERT_ARE_EQUAL(int, TWIN_EXCEPTION, result);
@@ -264,6 +333,9 @@ TEST_FUNCTION(TwinConfiguration_AllJsonKeysMissing_ExpectDefaultValuesFallback)
     STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationTimeValueFromJson(mockedReader, HIGH_PRIORITY_MESSAGE_FREQUENCY_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_CONF_NOT_EXIST);
     STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationTimeValueFromJson(mockedReader, LOW_PRIORITY_MESSAGE_FREQUENCY_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_CONF_NOT_EXIST);
     STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationTimeValueFromJson(mockedReader, SNAPSHOT_FREQUENCY_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_CONF_NOT_EXIST);
+    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationBoolValueFromJson(mockedReader, BASELINE_CUSTOM_CHECKS_ENABLED_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_CONF_NOT_EXIST);
+    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationStringValueFromJson(mockedReader, BASELINE_CUSTOM_CHECKS_FILE_PATH_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_CONF_NOT_EXIST);
+    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationStringValueFromJson(mockedReader, BASELINE_CUSTOM_CHECKS_FILE_HASH_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_CONF_NOT_EXIST);
     STRICT_EXPECTED_CALL(Lock(IGNORED_PTR_ARG));
     STRICT_EXPECTED_CALL(TwinConfigurationEventCollectors_Update(IGNORED_PTR_ARG)).SetReturn(TWIN_OK);
     STRICT_EXPECTED_CALL(TimeUtils_GetCurrentTime()).SetReturn(0);
@@ -333,6 +405,39 @@ TEST_FUNCTION(TwinConfiguration_GetSnapshotFrequencyWithLockError_ExpectLockExce
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 }
 
+TEST_FUNCTION(TwinConfiguration_GetBaselineCustomChecksEnabledWithLockError_ExpectLockException)
+{
+    bool boolean;
+    int result;
+
+    STRICT_EXPECTED_CALL(Lock(IGNORED_PTR_ARG)).SetReturn(LOCK_ERROR).IgnoreAllArguments();
+    result = TwinConfiguration_GetBaselineCustomChecksEnabled(&boolean);
+    ASSERT_ARE_EQUAL(int, TWIN_LOCK_EXCEPTION, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+TEST_FUNCTION(TwinConfiguration_GetBaselineCustomChecksFilePathWithLockError_ExpectLockException)
+{
+    char* str;
+    int result;
+
+    STRICT_EXPECTED_CALL(Lock(IGNORED_PTR_ARG)).SetReturn(LOCK_ERROR).IgnoreAllArguments();
+    result = TwinConfiguration_GetBaselineCustomChecksFilePath(&str);
+    ASSERT_ARE_EQUAL(int, TWIN_LOCK_EXCEPTION, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+TEST_FUNCTION(TwinConfiguration_GetBaselineCustomChecksFileHashWithLockError_ExpectLockException)
+{
+    char* str;
+    int result;
+
+    STRICT_EXPECTED_CALL(Lock(IGNORED_PTR_ARG)).SetReturn(LOCK_ERROR).IgnoreAllArguments();
+    result = TwinConfiguration_GetBaselineCustomChecksFileHash(&str);
+    ASSERT_ARE_EQUAL(int, TWIN_LOCK_EXCEPTION, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
 TEST_FUNCTION(TwinConfiguration_UpdateWithLockError_ExpectLockException)
 {
     unsigned int num;
@@ -347,6 +452,9 @@ TEST_FUNCTION(TwinConfiguration_UpdateWithLockError_ExpectLockException)
     STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationTimeValueFromJson(mockedReader, HIGH_PRIORITY_MESSAGE_FREQUENCY_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_CONF_NOT_EXIST);
     STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationTimeValueFromJson(mockedReader, LOW_PRIORITY_MESSAGE_FREQUENCY_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_CONF_NOT_EXIST);
     STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationTimeValueFromJson(mockedReader, SNAPSHOT_FREQUENCY_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_CONF_NOT_EXIST);
+    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationBoolValueFromJson(mockedReader, BASELINE_CUSTOM_CHECKS_ENABLED_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_CONF_NOT_EXIST);
+    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationStringValueFromJson(mockedReader, BASELINE_CUSTOM_CHECKS_FILE_PATH_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_CONF_NOT_EXIST);
+    STRICT_EXPECTED_CALL(TwinConfigurationUtils_GetConfigurationStringValueFromJson(mockedReader, BASELINE_CUSTOM_CHECKS_FILE_HASH_KEY, IGNORED_PTR_ARG)).SetReturn(TWIN_CONF_NOT_EXIST);
     STRICT_EXPECTED_CALL(Lock(IGNORED_PTR_ARG)).SetReturn(LOCK_ERROR).IgnoreAllArguments();
     STRICT_EXPECTED_CALL(TimeUtils_GetCurrentTime()).SetReturn(0);
     STRICT_EXPECTED_CALL(JsonObjectReader_Deinit(mockedReader));
@@ -361,7 +469,7 @@ TEST_FUNCTION(TwinConfiguration_UpdateWithUnlockError_ExpectLockException)
       ValidateTwinConfigurationUpdate(true /*isComplete*/, true /*injectUnlockError*/);
 }
 
-TEST_FUNCTION(TwinConfiguration_TestGetLastTwinUpdateDataExpectSuccess){
+TEST_FUNCTION(TwinConfiguration_GetLastTwinUpdateData_ExpectSuccess){
     ValidateTwinConfigurationUpdate(true /*isComplete*/, false /*injectUnlockError*/);
     TwinConfigurationUpdateResult result = { 0 };
     TwinConfiguration_GetLastTwinUpdateData(&result);
@@ -374,9 +482,12 @@ TEST_FUNCTION(TwinConfiguration_TestGetLastTwinUpdateDataExpectSuccess){
     ASSERT_ARE_EQUAL(int, CONFIGURATION_OK, result.configurationBundleStatus.maxLocalCacheSize);
     ASSERT_ARE_EQUAL(int, CONFIGURATION_OK, result.configurationBundleStatus.maxMessageSize);
     ASSERT_ARE_EQUAL(int, CONFIGURATION_OK, result.configurationBundleStatus.snapshotFrequency);
+    ASSERT_ARE_EQUAL(int, CONFIGURATION_OK, result.configurationBundleStatus.baselineCustomChecksEnabled);
+    ASSERT_ARE_EQUAL(char_ptr, CONFIGURATION_OK, result.configurationBundleStatus.baselineCustomChecksFilePath);
+    ASSERT_ARE_EQUAL(char_ptr, CONFIGURATION_OK, result.configurationBundleStatus.baselineCustomChecksFileHash);
 }
 
-TEST_FUNCTION(TwinConfiguration_TestGetSerializedwinConfiguratioExpectSuccess) {
+TEST_FUNCTION(TwinConfiguration_GetSerializedTwinConfiguration_ExpectSuccess) {
     
     umock_c_reset_all_calls();
     uint32_t outSize;
@@ -392,6 +503,9 @@ TEST_FUNCTION(TwinConfiguration_TestGetSerializedwinConfiguratioExpectSuccess) {
     STRICT_EXPECTED_CALL(TwinConfigurationUtils_WriteStringConfigurationToJson(IGNORED_PTR_ARG, LOW_PRIORITY_MESSAGE_FREQUENCY_KEY, IGNORED_NUM_ARG)).SetReturn(TWIN_OK);
     STRICT_EXPECTED_CALL(TimeUtils_MillisecondsToISO8601DurationString(IGNORED_NUM_ARG, IGNORED_PTR_ARG, IGNORED_NUM_ARG)).SetReturn(true);
     STRICT_EXPECTED_CALL(TwinConfigurationUtils_WriteStringConfigurationToJson(IGNORED_PTR_ARG, SNAPSHOT_FREQUENCY_KEY, IGNORED_NUM_ARG)).SetReturn(TWIN_OK);
+    STRICT_EXPECTED_CALL(TwinConfigurationUtils_WriteBoolConfigurationToJson(IGNORED_PTR_ARG, BASELINE_CUSTOM_CHECKS_ENABLED_KEY, IGNORED_NUM_ARG)).SetReturn(TWIN_OK);
+    STRICT_EXPECTED_CALL(TwinConfigurationUtils_WriteStringConfigurationToJson(IGNORED_PTR_ARG, BASELINE_CUSTOM_CHECKS_FILE_PATH_KEY, IGNORED_NUM_ARG)).SetReturn(TWIN_OK);
+    STRICT_EXPECTED_CALL(TwinConfigurationUtils_WriteStringConfigurationToJson(IGNORED_PTR_ARG, BASELINE_CUSTOM_CHECKS_FILE_HASH_KEY, IGNORED_NUM_ARG)).SetReturn(TWIN_OK);
     STRICT_EXPECTED_CALL(TwinConfigurationEventCollectors_GetPrioritiesJson(IGNORED_PTR_ARG)).SetReturn(TWIN_OK);
     STRICT_EXPECTED_CALL(JsonObjectWriter_WriteObject(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_NUM_ARG)).SetReturn(JSON_WRITER_OK);
     STRICT_EXPECTED_CALL(JsonObjectWriter_Serialize(IGNORED_PTR_ARG, &out, &outSize));
@@ -408,7 +522,7 @@ TEST_FUNCTION(TwinConfiguration_TestGetSerializedwinConfiguratioExpectSuccess) {
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 }
 
-TEST_FUNCTION(TwinConfiguration_TestGetSerializedwinConfiguratioExpectFail) {
+TEST_FUNCTION(TwinConfiguration_GetSerializedTwinConfiguration_ExpectFail) {
     
     umock_c_negative_tests_init();
     uint32_t outSize;
@@ -446,6 +560,7 @@ TEST_FUNCTION(TwinConfiguration_TestGetSerializedwinConfiguratioExpectFail) {
 }
 
 TEST_FUNCTION(TwinConfiguration_Update_MalformedJson_ConfigStayIntact){
+    
     TwinConfigurationResult result = TwinConfiguration_Init();
     ASSERT_ARE_EQUAL(int, TWIN_OK, result);    
     ValidateDefaultTwinConfigurationParameters();
@@ -461,6 +576,9 @@ TEST_FUNCTION(TwinConfiguration_Update_MalformedJson_ConfigStayIntact){
     STRICT_EXPECTED_CALL(JsonObjectReader_ReadString(readerHandle, HIGH_PRIORITY_MESSAGE_FREQUENCY_KEY, IGNORED_PTR_ARG)).SetReturn(JSON_READER_PARSE_ERROR);
     STRICT_EXPECTED_CALL(JsonObjectReader_ReadString(readerHandle, LOW_PRIORITY_MESSAGE_FREQUENCY_KEY, IGNORED_PTR_ARG)).SetReturn(JSON_READER_PARSE_ERROR);
     STRICT_EXPECTED_CALL(JsonObjectReader_ReadString(readerHandle, SNAPSHOT_FREQUENCY_KEY, IGNORED_PTR_ARG)).SetReturn(JSON_READER_PARSE_ERROR);
+    STRICT_EXPECTED_CALL(JsonObjectReader_ReadString(readerHandle, BASELINE_CUSTOM_CHECKS_ENABLED_KEY, IGNORED_PTR_ARG)).SetReturn(JSON_READER_PARSE_ERROR);
+    STRICT_EXPECTED_CALL(JsonObjectReader_ReadString(readerHandle, BASELINE_CUSTOM_CHECKS_FILE_PATH_KEY, IGNORED_PTR_ARG)).SetReturn(JSON_READER_PARSE_ERROR);
+    STRICT_EXPECTED_CALL(JsonObjectReader_ReadString(readerHandle, BASELINE_CUSTOM_CHECKS_FILE_HASH_KEY, IGNORED_PTR_ARG)).SetReturn(JSON_READER_PARSE_ERROR);
     STRICT_EXPECTED_CALL(JsonObjectReader_Deinit(readerHandle));
 
     result = TwinConfigurationEventCollectors_Update(readerHandle);

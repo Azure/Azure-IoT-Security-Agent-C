@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <ctype.h>
 
 #include "logger.h"
 
@@ -115,6 +116,26 @@ bool Utils_ConcatenateToString(char** buffer, uint32_t* bufferSize, const char* 
     return true;
 }
 
+
+ActionResult Utils_DuplicateString(char** dest, const char* src) {
+    if (src == NULL) {
+        *dest = NULL;
+        return ACTION_OK;
+    }
+
+    uint32_t size = strlen(src) + 1;
+    *dest = NULL;
+    *dest = malloc(size * sizeof(char));
+
+    if (*dest == NULL) {
+        return ACTION_MEMORY_EXCEPTION;
+    }
+
+    memcpy(*dest, src, size);
+    return ACTION_OK;
+}
+
+
 bool Utils_CreateStringCopy(char** newCopy, const char* src) {
     if (src == NULL || newCopy == NULL) {
         return false;
@@ -155,4 +176,70 @@ bool Utils_HexStringToByteArray(const char* hexString, unsigned char* buffer, ui
     buffer[hexStringLen / 2] = 0; // Terminate with null
     *bufferSize = hexStringLen / 2;
     return true;
+}
+
+bool Utils_IsStringBlank(const char* s) {
+    if (s == NULL) {
+        return true;
+    }
+
+    while (*s != '\0') {
+        if (!isspace((unsigned char)*s)) {
+            return false;
+        }
+      
+        s++;
+    }
+
+  return true;
+}
+
+bool Utils_IsStringNumeric(char* string){
+
+    if(string == NULL){
+        return false;
+    }
+    
+    while (*string != '\0') {
+        if(!isdigit((unsigned char)*string)){
+            return false;
+        }
+        string++;
+    }
+
+    return true;
+}
+
+ActionResult Utils_StringFormat(const char* str, char** output, ...) {
+    va_list args = {0};
+    ActionResult result = ACTION_OK;
+
+    if (str == NULL) {
+        result = ACTION_FAILED;
+        goto cleanup;
+    }
+
+    // resolve new str length without memory allocation
+    va_start(args, output);
+    int newStrFormattedLength = 1 + vsnprintf(NULL, 0, str, args);
+    va_end(args);
+
+    // allocate exact memory
+    *output = malloc(sizeof(char) * newStrFormattedLength);
+    if (*output == NULL) {
+        result = ACTION_MEMORY_EXCEPTION;
+        goto cleanup;
+    }
+
+    // format string with dynamic parameters
+    va_start(args, *output);
+    vsnprintf(*output, newStrFormattedLength, str, args);
+    va_end(args);
+cleanup:
+    if ((result != ACTION_OK) && (*output != NULL)) {
+        free(*output);
+        *output = NULL;
+    }
+
+    return result;
 }

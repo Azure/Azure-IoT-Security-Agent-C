@@ -15,6 +15,7 @@ set(${theseTestsName}_test_files
 
 set(${theseTestsName}_c_files
     ../../agent/src/os_utils/linux/listening_ports_iterator.c
+    ../../agent/src/consts.c
 )
 
 umockc_build_test_artifacts(${theseTestsName} ON)

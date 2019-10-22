@@ -139,6 +139,7 @@ extern const char* LISTENING_PORTS_LOCAL_ADDRESS_KEY;
 extern const char* LISTENING_PORTS_LOCAL_PORT_KEY;
 extern const char* LISTENING_PORTS_REMOTE_ADDRESS_KEY;
 extern const char* LISTENING_PORTS_REMOTE_PORT_KEY;
+extern const char* LISTENING_PORTS_PID_KEY;
 
 /* ===== Firewall Rules Message Schema =====*/
 

@@ -88,6 +88,33 @@ MOCKABLE_FUNCTION(, TwinConfigurationResult, TwinConfiguration_GetHighPriorityMe
 MOCKABLE_FUNCTION(, TwinConfigurationResult, TwinConfiguration_GetSnapshotFrequency, uint32_t*, snapshotFrequency);
 
 /**
+ * @brief   gets baselineCustomChecksEnabled from the twin configuration, thread safe
+ * 
+ * @param   baselineCustomChecksEnabled out param
+ * 
+ * @return  TWIN_OK                     on success or an error code upon failure
+ */
+MOCKABLE_FUNCTION(, TwinConfigurationResult, TwinConfiguration_GetBaselineCustomChecksEnabled, bool*, baselineCustomChecksEnabled);
+
+/**
+ * @brief   gets baselineCustomChecksFilePath from the twin configuration, thread safe
+ * 
+ * @param   baselineCustomChecksFilePath    out param
+ * 
+ * @return  TWIN_OK                         on success or an error code upon failure
+ */
+MOCKABLE_FUNCTION(, TwinConfigurationResult, TwinConfiguration_GetBaselineCustomChecksFilePath, char**, baselineCustomChecksFilePath);
+
+/**
+ * @brief   gets baselineCustomChecksFileHash from the twin configuration, thread safe
+ * 
+ * @param   baselineCustomChecksFileHash    out param
+ * 
+ * @return  TWIN_OK                         on success or an error code upon failure
+ */
+MOCKABLE_FUNCTION(, TwinConfigurationResult, TwinConfiguration_GetBaselineCustomChecksFileHash, char**, baselineCustomChecksFileHash);
+
+/**
  * @brief   gets serialized twin configuration
  * 
  * @param   twin   out param the serialized twin

@@ -11,6 +11,15 @@
 #include "umock_c_prod.h"
 
 /**
+ * Utils action result
+ */
+typedef enum _ActionResult {
+    ACTION_OK,
+    ACTION_FAILED,
+    ACTION_MEMORY_EXCEPTION
+} ActionResult;
+
+/**
  * @brief   converts a string to an integer using a given base
  * 
  * @param   input       the input string
@@ -120,9 +129,19 @@ bool Utils_ConcatenateToString(char** buffer, uint32_t* bufferSize, const char* 
 MOCKABLE_FUNCTION(, bool, Utils_AddUnsignedIntsWithOverflowCheck, uint32_t*, resultOut, uint32_t, a, uint32_t, b);
 
 /**
- * @brief   allocates buffer and copies the src string to dst
+ * @brief   allocates buffer and create new string dest from src
  * 
- * @param   dst          Pointer for the newly alocated copy
+ * @param   dest         Pointer for the newly alocated string
+ * @param   src          The string to copy
+ *
+ * @return true on success, false otherwise.
+ */
+MOCKABLE_FUNCTION(, ActionResult, Utils_DuplicateString, char**, dest, const char*, src);
+
+/**
+ * @brief   allocates buffer and copies the src string to newCopy
+ * 
+ * @param   newCopy      Pointer for the newly alocated copy
  * @param   src          The string to copy
  *
  * @return true on success, false otherwise.
@@ -139,5 +158,39 @@ MOCKABLE_FUNCTION(, bool, Utils_CreateStringCopy, char**, newCopy, const char*, 
  * @return true on success, false otherwise.
  */
 MOCKABLE_FUNCTION(, bool, Utils_HexStringToByteArray, const char*, hexString, unsigned char*, buffer, uint32_t*, bufferSize);
+
+/**
+ * @brief   Check if char* is blank {NULL, empty, whitespaces}
+ * 
+ * @param   s   string
+ *
+ * @return true iff s is blank.
+ */
+MOCKABLE_FUNCTION(, bool, Utils_IsStringBlank, const char*, s);
+
+/**
+ * @brief   Checks if the given string contains numbers only.
+ * 
+ * @param   string   string
+ *
+ * @return true iff string contains numbers only.
+ */
+MOCKABLE_FUNCTION(, bool, Utils_IsStringNumeric, char*, string);
+
+/**
+ * @brief   allocates memory for output and copies into it the formatted string.
+ * 
+ * @param   str   string
+ * @paran   output Pointer for the newly alocated string
+ *
+ * @return ACTION_RESULT 
+ */
+#ifdef ENABLE_MOCKS
+ActionResult Utils_StringFormat(const char* str, char** output, ...){
+    return ACTION_OK;
+}
+#else
+ActionResult Utils_StringFormat(const char* str, char** output, ...);
+#endif
 
 #endif //UTILS_H

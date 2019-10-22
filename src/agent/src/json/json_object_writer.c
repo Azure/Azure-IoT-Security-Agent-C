@@ -181,3 +181,9 @@ bool JsonObjectWriter_Compare(JsonObjectWriterHandle a, JsonObjectWriterHandle b
 
     return json_value_equals(writerObjA->rootValue, writerObjB->rootValue);
 }
+
+JsonWriterResult JsonObjectWriter_GetSize(JsonObjectWriterHandle handle, uint32_t* size) {
+    JsonObjectWriter* writer = (JsonObjectWriter*)handle;
+    *size = json_object_get_count(writer->rootObject);
+    return JSON_WRITER_OK;
+}

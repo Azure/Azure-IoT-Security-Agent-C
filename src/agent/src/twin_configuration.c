@@ -26,6 +26,10 @@ typedef struct _TwinConfiguration {
     uint32_t lowPriorityMessageFrequency;
     uint32_t highPriorityMessageFrequency;
     uint32_t snapshotFrequency;
+    
+    bool baselineCustomChecksEnabled;
+    char* baselineCustomChecksFilePath;
+    char* baselineCustomChecksFileHash;
 
     LOCK_HANDLE lock;
 } TwinConfiguration;
@@ -56,11 +60,43 @@ static TwinConfigurationResult TwinConfiguration_ExtractConfiguration(JsonObject
  */
 static TwinConfigurationResult TwinConfiguration_GetFieldInteger(uint32_t* value, uint32_t field);
 
+/**
+ * @brief   retrieves the value of a given twin configuration in a thread safe manner (currently using a lock)
+ * 
+ * @param   value       out param: the parsed value
+ * @param   field       field taken from the twin
+ * 
+ * @return  TWIN_OK     on success or an error code upon failure
+ */
+static TwinConfigurationResult TwinConfiguration_GetFieldBool(bool* value, bool field);
+
+/**
+ * @brief   retrieves the value of a given twin configuration in a thread safe manner (currently using a lock)
+ * 
+ * @param   value       out param: the parsed value
+ * @param   field       field taken from the twin
+ * 
+ * @return  TWIN_OK     on success or an error code upon failure
+ */
+static TwinConfigurationResult TwinConfiguration_GetFieldString(char** value, char* field);
+
+TwinConfigurationResult TwinConfiguration_Init();
+
+TwinConfigurationResult TwinConfiguration_DeepCopy(TwinConfiguration* dest, TwinConfiguration* src);
+
+void TwinConfiguration_SafeDeinit();
+
+void TwinConfiguration_Deinit();
+
+TwinConfigurationResult TwinConfiguration_Update(const char* json, bool complete);
+
 TwinConfigurationResult TwinConfiguration_Init() {
+    TwinConfigurationResult returnValue = TWIN_OK;
 
     twinConfiguration.lock = Lock_Init();
     if (twinConfiguration.lock == NULL) {
-        return TWIN_LOCK_EXCEPTION;
+        returnValue = TWIN_LOCK_EXCEPTION;
+        goto cleanup;
     }
 
     twinConfiguration.maxLocalCacheSize = DEFAULT_MAX_LOCAL_CACHE_SIZE;
@@ -69,21 +105,74 @@ TwinConfigurationResult TwinConfiguration_Init() {
     twinConfiguration.highPriorityMessageFrequency = DEFAULT_HIGH_PRIORITY_MESSAGE_FREQUENCY;
     twinConfiguration.snapshotFrequency = DEFAULT_SNAPSHOT_FREQUENCY;
 
-    twinConfigurationObjectName = LocalConfiguration_GetRemoteConfigurationObjectName();
-
-    TwinConfigurationResult twinResult = TwinConfigurationEventCollectors_Init();
-    
-    if (twinResult != TWIN_OK) {
-        Lock_Deinit(twinConfiguration.lock);
-        twinConfiguration.lock = NULL;
-        return twinResult;
+    twinConfiguration.baselineCustomChecksEnabled = DEFAULT_BASELINE_CUSTOM_CHECKS_ENABLED;
+    if (Utils_DuplicateString(&twinConfiguration.baselineCustomChecksFilePath, DEFAULT_BASELINE_CUSTOM_CHECKS_FILE_PATH) == ACTION_MEMORY_EXCEPTION) {
+        returnValue = TWIN_MEMORY_EXCEPTION;
+        goto cleanup;
     }
 
-    return TWIN_OK;
+    if (Utils_DuplicateString(&twinConfiguration.baselineCustomChecksFileHash, DEFAULT_BASELINE_CUSTOM_CHECKS_FILE_HASH) == ACTION_MEMORY_EXCEPTION) {
+        returnValue = TWIN_MEMORY_EXCEPTION;
+        goto cleanup;
+    }
+    twinConfigurationObjectName = LocalConfiguration_GetRemoteConfigurationObjectName();
+
+    returnValue = TwinConfigurationEventCollectors_Init();
+    if (returnValue != TWIN_OK) {
+        Lock_Deinit(twinConfiguration.lock);
+        twinConfiguration.lock = NULL;
+        goto cleanup;
+    }
+
+cleanup:
+    if (returnValue != TWIN_OK) {
+        TwinConfiguration_Deinit();
+    }
+    return returnValue;
+}
+
+TwinConfigurationResult TwinConfiguration_DeepCopy(TwinConfiguration* dest, TwinConfiguration* src) {
+    TwinConfigurationResult returnValue = TWIN_OK;
+
+    // Note: `dest->lock` maintains the global lock (consider change implementation)
+
+    dest->maxLocalCacheSize = src->maxLocalCacheSize;
+    dest->maxMessageSize = src->maxMessageSize;
+    dest->lowPriorityMessageFrequency = src->lowPriorityMessageFrequency;
+    dest->highPriorityMessageFrequency = src->highPriorityMessageFrequency;
+    dest->snapshotFrequency = src->snapshotFrequency;
+
+    dest->baselineCustomChecksEnabled = src->baselineCustomChecksEnabled;
+
+    if (Utils_DuplicateString(&(dest->baselineCustomChecksFilePath), src->baselineCustomChecksFilePath) == ACTION_MEMORY_EXCEPTION) {
+        returnValue = TWIN_MEMORY_EXCEPTION;
+        goto cleanup;
+    }
+
+    if (Utils_DuplicateString(&(dest->baselineCustomChecksFileHash), src->baselineCustomChecksFileHash) == ACTION_MEMORY_EXCEPTION) {
+        returnValue = TWIN_MEMORY_EXCEPTION;
+        goto cleanup;
+    }
+
+cleanup:
+    return returnValue;
+}
+
+void TwinConfiguration_SafeDeinit() {
+    if (twinConfiguration.baselineCustomChecksFilePath != NULL) {
+        free(twinConfiguration.baselineCustomChecksFilePath);
+        memcpy(&twinConfiguration.baselineCustomChecksFilePath, &DEFAULT_BASELINE_CUSTOM_CHECKS_FILE_PATH, sizeof(char*));
+    }
+
+    if (twinConfiguration.baselineCustomChecksFileHash != NULL) {
+        free(twinConfiguration.baselineCustomChecksFileHash);
+        memcpy(&twinConfiguration.baselineCustomChecksFileHash, &DEFAULT_BASELINE_CUSTOM_CHECKS_FILE_HASH, sizeof(char*));
+    }
 }
 
 void TwinConfiguration_Deinit() {
-    
+    TwinConfiguration_SafeDeinit();
+
     TwinConfigurationEventCollectors_Deinit();
 
     if (twinConfiguration.lock != NULL) {
@@ -144,9 +233,12 @@ TwinConfigurationResult TwinConfiguration_Update(const char* json, bool complete
         goto cleanup;
     }
     
-    newConfiguration.lock = twinConfiguration.lock;
-    memcpy(&twinConfiguration, &newConfiguration, sizeof(TwinConfiguration));
-    
+    TwinConfiguration_SafeDeinit();
+    returnValue = TwinConfiguration_DeepCopy(&twinConfiguration, &newConfiguration);
+    if (returnValue != TWIN_OK){
+        goto cleanup;
+    }
+
 cleanup:
     memcpy(&updateResult.configurationBundleStatus, &newBundleStatus, sizeof(TwinConfigurationBundleStatus));
     updateResult.lastUpdateResult = returnValue;
@@ -158,6 +250,10 @@ cleanup:
 
     if (isLocked && Unlock(twinConfiguration.lock) != LOCK_OK) {
         return TWIN_LOCK_EXCEPTION;
+    }
+
+    if (returnValue == TWIN_MEMORY_EXCEPTION) {
+        TwinConfiguration_Deinit();
     }
 
     return returnValue;
@@ -183,6 +279,18 @@ TwinConfigurationResult TwinConfiguration_GetSnapshotFrequency(uint32_t* snapsho
     return TwinConfiguration_GetFieldInteger(snapshotFrequency, twinConfiguration.snapshotFrequency);
 }
 
+TwinConfigurationResult TwinConfiguration_GetBaselineCustomChecksEnabled(bool* baselineCustomChecksEnabled) {
+    return TwinConfiguration_GetFieldBool(baselineCustomChecksEnabled, twinConfiguration.baselineCustomChecksEnabled);
+}
+
+TwinConfigurationResult TwinConfiguration_GetBaselineCustomChecksFilePath(char** baselineCustomChecksFilePath) {
+    return TwinConfiguration_GetFieldString(baselineCustomChecksFilePath, twinConfiguration.baselineCustomChecksFilePath);
+}
+
+TwinConfigurationResult TwinConfiguration_GetBaselineCustomChecksFileHash(char** baselineCustomChecksFileHash) {
+    return TwinConfiguration_GetFieldString(baselineCustomChecksFileHash, twinConfiguration.baselineCustomChecksFileHash);
+}
+
 static TwinConfigurationResult TwinConfiguration_SetSingleUintValueFromJsonOrDefault(uint32_t* value, uint32_t defaultValue, JsonObjectReaderHandle reader, const char* key, bool isTime, TwinConfigurationStatus* outStatus) {
     *outStatus = CONFIGURATION_OK;
     TwinConfigurationResult result;
@@ -196,6 +304,41 @@ static TwinConfigurationResult TwinConfiguration_SetSingleUintValueFromJsonOrDef
     if (result == TWIN_CONF_NOT_EXIST) {
         *value = defaultValue;
         result = TWIN_OK;
+    } else if (result == TWIN_PARSE_EXCEPTION) {
+        *outStatus = CONFIGURATION_TYPE_MISMATCH;
+    } 
+
+    return result;
+}
+
+static TwinConfigurationResult TwinConfiguration_SetSingleBoolValueFromJsonOrDefault(bool* value, bool defaultValue, JsonObjectReaderHandle reader, const char* key, TwinConfigurationStatus* outStatus) {
+    *outStatus = CONFIGURATION_OK;
+    TwinConfigurationResult result;
+
+    result = TwinConfigurationUtils_GetConfigurationBoolValueFromJson(reader, key, value);
+    
+    if (result == TWIN_CONF_NOT_EXIST) {
+        *value = defaultValue;
+        result = TWIN_OK;
+    } else if (result == TWIN_PARSE_EXCEPTION) {
+        *outStatus = CONFIGURATION_TYPE_MISMATCH;
+    } 
+
+    return result;
+}
+
+static TwinConfigurationResult TwinConfiguration_SetSingleStringValueFromJsonOrDefault(char** value, const char* defaultValue, JsonObjectReaderHandle reader, const char* key, TwinConfigurationStatus* outStatus) {
+    *outStatus = CONFIGURATION_OK;
+    TwinConfigurationResult result;
+
+    result = TwinConfigurationUtils_GetConfigurationStringValueFromJson(reader, key, value);
+    
+    if (result == TWIN_CONF_NOT_EXIST) {
+        if (Utils_DuplicateString(value, defaultValue) == ACTION_MEMORY_EXCEPTION) {
+            result = TWIN_MEMORY_EXCEPTION;
+        } else {
+            result = TWIN_OK;
+        }
     } else if (result == TWIN_PARSE_EXCEPTION) {
         *outStatus = CONFIGURATION_TYPE_MISMATCH;
     } 
@@ -247,11 +390,63 @@ static TwinConfigurationResult TwinConfiguration_ExtractConfiguration(JsonObject
         goto cleanup;
     }
 
+    currentKeyResult = TwinConfiguration_SetSingleBoolValueFromJsonOrDefault(&(newConfiguration->baselineCustomChecksEnabled), DEFAULT_BASELINE_CUSTOM_CHECKS_ENABLED, jsonReader, BASELINE_CUSTOM_CHECKS_ENABLED_KEY, &(parsingResult->baselineCustomChecksEnabled));
+    if (currentKeyResult == TWIN_PARSE_EXCEPTION) {
+        result = currentKeyResult;
+    } else if (currentKeyResult != TWIN_OK) {
+        result = currentKeyResult;
+        goto cleanup;
+    }
+
+    currentKeyResult = TwinConfiguration_SetSingleStringValueFromJsonOrDefault(&(newConfiguration->baselineCustomChecksFilePath), DEFAULT_BASELINE_CUSTOM_CHECKS_FILE_PATH, jsonReader, BASELINE_CUSTOM_CHECKS_FILE_PATH_KEY, &(parsingResult->baselineCustomChecksFilePath));
+    if (currentKeyResult == TWIN_PARSE_EXCEPTION) {
+        result = currentKeyResult;
+    } else if (currentKeyResult != TWIN_OK) {
+        result = currentKeyResult;
+        goto cleanup;
+    }
+
+    currentKeyResult = TwinConfiguration_SetSingleStringValueFromJsonOrDefault(&(newConfiguration->baselineCustomChecksFileHash), DEFAULT_BASELINE_CUSTOM_CHECKS_FILE_HASH, jsonReader, BASELINE_CUSTOM_CHECKS_FILE_HASH_KEY, &(parsingResult->baselineCustomChecksFileHash));
+    if (currentKeyResult == TWIN_PARSE_EXCEPTION) {
+        result = currentKeyResult;
+    } else if (currentKeyResult != TWIN_OK) {
+        result = currentKeyResult;
+        goto cleanup;
+    }
+
 cleanup:
     return result;
 }
 
 static TwinConfigurationResult TwinConfiguration_GetFieldInteger(uint32_t* value, uint32_t field) {
+    if (Lock(twinConfiguration.lock) != LOCK_OK) {
+        return TWIN_LOCK_EXCEPTION;
+    }
+
+    *value = field;
+
+    if (Unlock(twinConfiguration.lock) != LOCK_OK) {
+        return TWIN_LOCK_EXCEPTION;
+    }
+
+    return TWIN_OK;
+}
+
+static TwinConfigurationResult TwinConfiguration_GetFieldBool(bool* value, bool field) {
+    if (Lock(twinConfiguration.lock) != LOCK_OK) {
+        return TWIN_LOCK_EXCEPTION;
+    }
+
+    *value = field;
+
+    if (Unlock(twinConfiguration.lock) != LOCK_OK) {
+        return TWIN_LOCK_EXCEPTION;
+    }
+
+    return TWIN_OK;
+}
+
+static TwinConfigurationResult TwinConfiguration_GetFieldString(char** value, char* field) {
     if (Lock(twinConfiguration.lock) != LOCK_OK) {
         return TWIN_LOCK_EXCEPTION;
     }
@@ -309,6 +504,7 @@ TwinConfigurationResult TwinConfiguration_GetSerializedTwinConfiguration(char** 
         result = TWIN_EXCEPTION;
         goto cleanup;
     }
+
     result = TwinConfigurationUtils_WriteStringConfigurationToJson(configurationObject, HIGH_PRIORITY_MESSAGE_FREQUENCY_KEY, timeSpan);
     if (result != TWIN_OK) {
         goto cleanup;
@@ -327,7 +523,23 @@ TwinConfigurationResult TwinConfiguration_GetSerializedTwinConfiguration(char** 
         result = TWIN_EXCEPTION;
         goto cleanup;
     }
+
     result = TwinConfigurationUtils_WriteStringConfigurationToJson(configurationObject, SNAPSHOT_FREQUENCY_KEY, timeSpan);
+    if (result != TWIN_OK) {
+        goto cleanup;
+    }
+
+    result = TwinConfigurationUtils_WriteBoolConfigurationToJson(configurationObject, BASELINE_CUSTOM_CHECKS_ENABLED_KEY, twinConfiguration.baselineCustomChecksEnabled);
+    if (result != TWIN_OK) {
+        goto cleanup;
+    }
+
+    result = TwinConfigurationUtils_WriteStringConfigurationToJson(configurationObject, BASELINE_CUSTOM_CHECKS_FILE_PATH_KEY, twinConfiguration.baselineCustomChecksFilePath);
+    if (result != TWIN_OK) {
+        goto cleanup;
+    }
+
+    result = TwinConfigurationUtils_WriteStringConfigurationToJson(configurationObject, BASELINE_CUSTOM_CHECKS_FILE_HASH_KEY, twinConfiguration.baselineCustomChecksFileHash);
     if (result != TWIN_OK) {
         goto cleanup;
     }

@@ -5,6 +5,7 @@
 #define EVENT_PRIO_PREFIX "eventPriority"
 #define EVENT_AGG_ENABLED_PREFIX "aggregationEnabled"
 #define EVENT_AGG_INTERVAL_PREFIX "aggregationInterval"
+#define BASELINE_CUSTOM_CHECKS_PREFIX "baselineCustomChecks"
 
 /* ===== Twin configuration Schema =====*/
 const char* LOW_PRIORITY_MESSAGE_FREQUENCY_KEY = "lowPriorityMessageFrequency";
@@ -16,7 +17,6 @@ const char* HUB_RESOURCE_ID_KEY = "hubResourceId";
 const char* EVENT_PROPERTIES_KEY = "eventPriorities";
 
 /* ===== Event priorities schema =====*/
-
 const char* PROCESS_CREATE_PRIORITY_KEY = EVENT_PRIO_PREFIX"ProcessCreate";
 const char* LISTENING_PORTS_PRIORITY_KEY = EVENT_PRIO_PREFIX"ListeningPorts";
 const char* SYSTEM_INFORMATION_PRIORITY_KEY = EVENT_PRIO_PREFIX"SystemInformation";
@@ -33,3 +33,8 @@ const char* PROCESS_CREATE_AGGREGATION_ENABLED_KEY = EVENT_AGG_ENABLED_PREFIX"Pr
 const char* PROCESS_CREATE_AGGREGATION_INTERVAL_KEY = EVENT_AGG_INTERVAL_PREFIX"ProcessCreate";
 const char* CONNECTION_CREATE_AGGREGATION_ENABLED_KEY = EVENT_AGG_ENABLED_PREFIX"ConnectionCreate";
 const char* CONNECTION_CREATE_AGGREGATION_INTERVAL_KEY = EVENT_AGG_INTERVAL_PREFIX"ConnectionCreate";
+
+/* ===== Baseline custom checks configuration =====*/
+const char* BASELINE_CUSTOM_CHECKS_ENABLED_KEY = BASELINE_CUSTOM_CHECKS_PREFIX"Enabled";
+const char* BASELINE_CUSTOM_CHECKS_FILE_PATH_KEY = BASELINE_CUSTOM_CHECKS_PREFIX"FilePath";
+const char* BASELINE_CUSTOM_CHECKS_FILE_HASH_KEY = BASELINE_CUSTOM_CHECKS_PREFIX"FileHash";

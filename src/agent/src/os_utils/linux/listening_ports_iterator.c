@@ -15,12 +15,12 @@
 #define MAX_NET_ADDR_LENGTH 128 
 #define MAX_NET_PORT_LENGTH 20 
 #define MAX_LINE_LENGTH 8192 
-static const char* PROC_LINE_FORMAT = "%*d: %64[0-9A-Fa-f]:%X %64[0-9A-Fa-f]:%X %X %*s\n";
+#define MAX_INODE_LENGTH 20
+#define MAX_PROC_FILE_NAME_LENGTH 20
+
+static const char* PROC_LINE_FORMAT = "%*d: %64[0-9A-Fa-f]:%X %64[0-9A-Fa-f]:%X %X %*s %*s %*s %*s %*s %s %*s\n";
 static const char ANY_PORT[] = "*";
-static const int ESTABLISHED_PORT_STATE = 1;
-static const int LISTENING_PORT_STATE = 10;
-static const char* TCP_PORTS_PROC_FILE = "/proc/net/tcp";
-static const char* UDP_PORTS_PROC_FILE = "/proc/net/udp";
+static const char* PORTS_PROC_FILE = "/proc/net/%s";
 
 typedef struct _ListeningPortsIterator {
 
@@ -29,7 +29,8 @@ typedef struct _ListeningPortsIterator {
     int localPort;
     char remoteAddress[MAX_NET_ADDR_LENGTH];
     int remotePort;
-
+    char inode[MAX_INODE_LENGTH];
+    
 } ListeningPortsIterator;
 
 /**
@@ -56,7 +57,7 @@ ListeningPortsIteratorResults ListenintPortsIterator_GetPort(int port, char* buf
  */
 ListeningPortsIteratorResults ListeningPortsIterator_GetAddress(const char* srcAddress, char* destAddress, uint32_t destAddressLength);
 
-ListeningPortsIteratorResults ListenintPortsIterator_Init(ListeningPortsIteratorHandle* iterator, ListeningPortsType type) {
+ListeningPortsIteratorResults ListenintPortsIterator_Init(ListeningPortsIteratorHandle* iterator, const char* protocolType) {
     ListeningPortsIteratorResults result = LISTENING_PORTS_ITERATOR_OK;
 
     ListeningPortsIterator* iteratorObj = malloc(sizeof(ListeningPortsIterator));
@@ -65,18 +66,16 @@ ListeningPortsIteratorResults ListenintPortsIterator_Init(ListeningPortsIterator
         goto cleanup;
     }
     memset(iteratorObj, 0, sizeof(ListeningPortsIterator));
-    if (type == LISTENING_PORTS_TCP) {
-        iteratorObj->procFile = fopen(TCP_PORTS_PROC_FILE, "r");
-    } else if (type == LISTENING_PORTS_UDP) {
-        iteratorObj->procFile = fopen(UDP_PORTS_PROC_FILE, "r");
-    }
-    
+    char proc_file_name[MAX_PROC_FILE_NAME_LENGTH];
+    snprintf(proc_file_name, MAX_PROC_FILE_NAME_LENGTH, PORTS_PROC_FILE, protocolType);
+    iteratorObj->procFile = fopen(proc_file_name, "r");
+   
     if (iteratorObj->procFile == NULL) {
         result = LISTENING_PORTS_ITERATOR_EXCEPTION;
         goto cleanup;
     }
 
-    char currentLine[MAX_LINE_LENGTH] = "";
+    char currentLine[MAX_LINE_LENGTH] = { 0 };
     // skip the first line (headers line)
     if (fgets(currentLine, sizeof(currentLine), iteratorObj->procFile) == NULL && ferror(iteratorObj->procFile)) {
         result = LISTENING_PORTS_ITERATOR_EXCEPTION;
@@ -107,30 +106,23 @@ ListeningPortsIteratorResults ListenintPortsIterator_GetNext(ListeningPortsItera
     ListeningPortsIterator* iteratorObj = (ListeningPortsIterator*)iterator;
     bool foundRecord = false;
 
-    while (!foundRecord) {
+    if (feof(iteratorObj->procFile) != 0) {
+        return LISTENING_PORTS_ITERATOR_NO_MORE_DATA;
+    }
+
+    char currentLine[MAX_LINE_LENGTH] = { 0 };
+    if (fgets(currentLine, sizeof(currentLine), iteratorObj->procFile) == NULL) {
         if (feof(iteratorObj->procFile) != 0) {
             return LISTENING_PORTS_ITERATOR_NO_MORE_DATA;
         }
-
-        char currentLine[MAX_LINE_LENGTH] = "";
-        if (fgets(currentLine, sizeof(currentLine), iteratorObj->procFile) == NULL) {
-            if (feof(iteratorObj->procFile) != 0) {
-                return LISTENING_PORTS_ITERATOR_NO_MORE_DATA;
-            }
-            return LISTENING_PORTS_ITERATOR_EXCEPTION;
-        }
-
-        int portState = 0;
-        int scanResult = sscanf(currentLine, PROC_LINE_FORMAT, iteratorObj->localAddress, &iteratorObj->localPort, iteratorObj->remoteAddress, &iteratorObj->remotePort, &portState);
-        if (scanResult != 5) {
-            return LISTENING_PORTS_ITERATOR_EXCEPTION;
-        }
-
-        if (portState == ESTABLISHED_PORT_STATE || portState == LISTENING_PORT_STATE) {
-            foundRecord = true; 
-        }
+        return LISTENING_PORTS_ITERATOR_EXCEPTION;
     }
-    
+
+    int portState = 0;
+    int scanResult = sscanf(currentLine, PROC_LINE_FORMAT, iteratorObj->localAddress, &iteratorObj->localPort, iteratorObj->remoteAddress, &iteratorObj->remotePort, &portState, &iteratorObj->inode);
+    if (scanResult != 6) {
+        return LISTENING_PORTS_ITERATOR_EXCEPTION;
+    }
 
     return LISTENING_PORTS_ITERATOR_HAS_NEXT;
 }
@@ -153,6 +145,18 @@ ListeningPortsIteratorResults ListenintPortsIterator_GetRemoteAddress(ListeningP
 ListeningPortsIteratorResults ListenintPortsIterator_GetRemotePort(ListeningPortsIteratorHandle iterator, char* port, uint32_t portLength) {
     ListeningPortsIterator* iteratorObj = (ListeningPortsIterator*)iterator;
     return ListenintPortsIterator_GetPort(iteratorObj->remotePort, port, portLength);
+}
+
+ListeningPortsIteratorResults ListenintPortsIterator_GetPid(ListeningPortsIteratorHandle iterator, char* pid, uint32_t pidLength, MAP_HANDLE inodesMap) {
+    ListeningPortsIterator* iteratorObj = (ListeningPortsIterator*)iterator;
+    const char* iteratorPid = Map_GetValueFromKey(inodesMap, iteratorObj->inode);
+    if(iteratorPid == NULL){
+        return LISTENING_PORTS_ITERATOR_OK;
+    }
+    if (!Utils_CopyString(iteratorPid, strlen(iteratorPid), pid, pidLength)) {
+        return LISTENING_PORTS_ITERATOR_EXCEPTION;
+    }
+    return LISTENING_PORTS_ITERATOR_OK;
 }
 
 ListeningPortsIteratorResults ListeningPortsIterator_GetAddress(const char* srcAddress, char* destAddress, uint32_t destAddressLength) {

@@ -31,4 +31,9 @@ extern const char* PROCESS_CREATE_AGGREGATION_INTERVAL_KEY;
 extern const char* CONNECTION_CREATE_AGGREGATION_ENABLED_KEY;
 extern const char* CONNECTION_CREATE_AGGREGATION_INTERVAL_KEY;
 
+/* ===== Baseline custom checks configuration =====*/
+extern const char* BASELINE_CUSTOM_CHECKS_ENABLED_KEY;
+extern const char* BASELINE_CUSTOM_CHECKS_FILE_PATH_KEY;
+extern const char* BASELINE_CUSTOM_CHECKS_FILE_HASH_KEY;
+
 #endif //TWIN_CONFIGURATION_CONSTS_H

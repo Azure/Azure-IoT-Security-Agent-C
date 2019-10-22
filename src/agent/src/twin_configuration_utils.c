@@ -59,6 +59,9 @@ TwinConfigurationResult TwinConfigurationUtils_WriteUintConfigurationToJson(Json
 }
 
 TwinConfigurationResult TwinConfigurationUtils_WriteStringConfigurationToJson(JsonObjectWriterHandle writer, const char* key, const char* value) {
+    if (value == NULL) {
+        return TWIN_OK;
+    }
     return TwinConfigurationUtils_Internal_WriteConfigurationToJson(writer, key, value, STRING);
 }
 

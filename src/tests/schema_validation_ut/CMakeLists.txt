@@ -50,6 +50,8 @@ set(${theseTestsName}_c_files
     ../../agent/src/json/json_array_writer.c
     ../../agent/src/os_utils/linux/correlation_manager.c
     ../../azure-iot-sdk-c/deps/parson/parson.c
+    ../../azure-iot-sdk-c/c-utility/src/map.c
+    ../../azure-iot-sdk-c/c-utility/src/xlogging.c
 )
 
 configure_file(../../Azure-IoT-Security/security_message/schemas/messageEventDiagnostic_v1_0.json ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)

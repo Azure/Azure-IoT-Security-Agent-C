@@ -123,4 +123,14 @@ MOCKABLE_FUNCTION(, JsonWriterResult, JsonObjectWriter_Copy, JsonObjectWriterHan
  */
 MOCKABLE_FUNCTION(, bool, JsonObjectWriter_Compare, JsonObjectWriterHandle, a, JsonObjectWriterHandle, b);
 
+/**
+ * @brief Returns the number of items in this array.
+ * 
+ * @param   handle          The writer instance.
+ * @param   size   Out param. On success contains the number of elements in the array.
+ * 
+ * @return JSON_WRITER_OK.
+ */
+MOCKABLE_FUNCTION(, JsonWriterResult, JsonObjectWriter_GetSize, JsonObjectWriterHandle, handle, uint32_t*, size);
+
 #endif //JSON_OBJECT_WRITER_H

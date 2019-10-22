@@ -69,6 +69,8 @@ endif()
 set(original_run_unittests ${run_unittests})
 set(run_unittests OFF)
 
+add_subdirectory(testrunnerswitcher)
+add_subdirectory(ctest)
 add_subdirectory(umock-c)
 add_subdirectory(azure-iot-sdk-c)
 

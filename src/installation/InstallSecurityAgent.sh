@@ -7,11 +7,12 @@ _targetDirectory="/var/ASCIoTAgent"
 _execName="ASCIoTAgent"
 _scriptDir=
 _mode="none"
-_omsBaselineExecutablePath="https://raw.githubusercontent.com/Microsoft/OMS-Agent-for-Linux/master/source/code/plugins/"
-_omsBaselineX64="omsbaseline_x64"
-_omsBaselineX86="omsbaseline_x86"
+_omsBaselineExecutablePath="https://ascforiot.blob.core.windows.net/public/"
+_omsBaselineX64="omsbaseline-linux-amd64"
+_omsBaselineI386="omsbaseline-linux-386"
+_omsBaselineARMv7="omsbaseline-linux-arm-v7"
 _omsAudits="oms_audits.xml"
-_omsbaselineExe="omsbaseline"
+_omsBaseline="omsbaseline"
 _identity=
 _authenticationMethod=
 _filePath=
@@ -59,7 +60,7 @@ uninstallagent()
     systemctl disable $_serviceTemplateName
 
     #remove the agent files
-    rm -rf $_targetDirectory 
+    rm -rf $_targetDirectory
 
     #remove the service user
     deluser --remove-home --remove-all-files $_userName
@@ -74,29 +75,45 @@ installagent()
 {
     #install dependencies
     echo installing agent dependencies
-    apt-get install -y auditd uuid-runtime libcurl4-openssl-dev
-    apt-get install -y uuid-runtime
-    
+    apt-get update -y && apt-get install -y \
+        auditd \
+        uuid-runtime \
+        libcurl4-openssl-dev
+
     echo installing agent
-    
+
     #add the service user
     echo creating service user
     adduser --disabled-login --gecos 'ASC IoT Agent' $_userName
     usermod -a -G sudo $_userName
 
+    #Get oms executables according to systems architecture
+    baselinePath="$_scriptDir/$_omsBaseline"
+
     #get oms executables:
     wgetAndExitOnFail "${_omsBaselineExecutablePath}${_omsAudits}" "$_scriptDir/$_omsAudits"
 
-    if [ $(uname -m) == 'x86_64' ]; then
-        wgetAndExitOnFail "${_omsBaselineExecutablePath}${_omsBaselineX64}"  "$_scriptDir/$_omsbaselineExe"	
-    elif [ $(uname -m) == 'x86' ]; then
-        wgetAndExitOnFail "${_omsBaselineExecutablePath}${_omsBaselineX86}" "$_scriptDir/$_omsbaselineExe"
-    fi
+    # download omsbaseline supported architecture
+	case $(uname -m) in
+    'x86_64')
+        wgetAndExitOnFail "${_omsBaselineExecutablePath}${_omsBaselineX64}"  $baselinePath
+        ;;
+    'armv7l')
+		wgetAndExitOnFail "${_omsBaselineExecutablePath}${_omsBaselineARMv7}"  $baselinePath
+		;;
+    'i368')
+        wgetAndExitOnFail "${_omsBaselineExecutablePath}${_omsBaselineI386}" $baselinePath
+		;;
+    *)
+		echo "Not supported architecture"
+        exit 1
+		;;
+	esac
 
-    #populate the target directory with the agent files 
+    #populate the target directory with the agent files
     mkdir $_targetDirectory
     cp -r $_scriptDir/* $_targetDirectory
-    
+
     #add connection string in app.config
     sed -i -e "s|\"Identity\" : \"[^\"]*\"|\"Identity\" : \"$_identity\"|g" $_targetDirectory/LocalConfiguration.json
     sed -i -e "s|\"AuthenticationMethod\" : \"[^\"]*\"|\"AuthenticationMethod\" : \"$_authenticationMethod\"|g" $_targetDirectory/LocalConfiguration.json
@@ -107,19 +124,19 @@ installagent()
     #generate agentId GUID
     agentId=$(uuidgen)
     sed -i -e "s|\"AgentId\" : \"[^\"]*\"|\"AgentId\" : \"$agentId\"|g" $_targetDirectory/LocalConfiguration.json
-    
+
     #make the agent user owner of the target directory
     chown -R $_userName:$_userName $_targetDirectory
-    
+
     #make agent executable
     chown root $_targetDirectory/$_execName
     chmod 4755 $_targetDirectory/$_execName
-    chmod 4755 $_targetDirectory/$_omsbaselineExe
-    
+    chmod +x $_targetDirectory/$_omsBaseline
+
     #replace variables in the service file template
     sed -e "s|{DIRECTORY}|$_targetDirectory|g" -e "s|{EXE}|$_execName|g" -e "s|{USER}|$_userName|g" -e "s|{GROUP}|$_userName|g" $_serviceTemplateName > $_systemServiceFileLocation/$_serviceTemplateName
 
-    #reload the deamon, in case is was already installed before    
+    #reload the deamon, in case is was already installed before
     systemctl daemon-reload
 
     #enable the service so that it starts on boot
@@ -134,15 +151,15 @@ installagent()
 validate_installation_params()
 {
     shouldExit=false
-    
+
     if [ -z "$_authenticationMethod" ]
     then
 		echo "authentication-method not provided"
         shouldExit=true
     fi
-	
+
 	if [ -z "$_filePath" ]
-	then 
+	then
 		echo "file-path not provided"
         shouldExit=true
 	fi
@@ -153,27 +170,42 @@ validate_installation_params()
         shouldExit=true
 	else
 		if [ -z "$_hostName" ]
-		then 
+		then
 			echo "host-name not provided"
 			shouldExit=true
 		fi
 
 		if [ -z "$_deviceId" ]
-		then 
+		then
 			echo "device-id not provided"
 			shouldExit=true
 		fi
 	fi
 
     if $shouldExit
-    then 
+    then
         echo "cannot intall the agent, please check the validity of the supplied parameters"
         exit 1
     fi
 }
 
-#parse command line arguments
+setFilePath(){
+	file=$1
+	dir=$(pwd)
+	if [[ $file == /* ]]
+	then
+		_filePath=$file
+	else
+		_filePath=$dir/$file
 
+	fi
+	if [ ! -f $_filePath ]; then
+		echo "File $_filePath does not exist!";
+		exit 1;
+	fi
+}
+
+#parse command line arguments
 while [ "$1" != "" ]; do
     case $1 in
         -aui | --authentication-identity )  shift
@@ -183,7 +215,7 @@ while [ "$1" != "" ]; do
                 echo "Possible values for authentication-identity are: SecurityModule or Device"
                 usage
                 exit 1
-            fi	
+            fi
                                     ;;
         -aum | --authentication-method )  shift
             if [ "$1" = "SymmetricKey" ] || [ "$1" = "SelfSignedCertificate" ]; then
@@ -192,10 +224,10 @@ while [ "$1" != "" ]; do
                 echo "Possible values for authentication-method are: SymmetricKey or SelfSignedCertificate"
                 usage
                 exit 1
-            fi	
+            fi
                                     ;;
         -f | --file-path )          shift
-                                    _filePath=$1
+                                    setFilePath $1
                                     ;;
 		-hn | --host-name )         shift
 									_hostName=$1

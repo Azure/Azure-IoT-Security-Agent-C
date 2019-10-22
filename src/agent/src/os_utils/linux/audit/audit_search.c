@@ -15,6 +15,8 @@
 
 static const char AUDIT_SEARCH_CRITERIA_TYPE_NAME[] = "type";
 static const char AUDIT_SEARCH_CRITERIA_SYSCALL_NAME[] = "syscall";
+static const char AUDIT_USER_AUTH_NAME[] = "USER_AUTH";
+static const char AUDIT_USER_AUTH_SEARECH_RULE[] = "(type r= USER_AUTH) && (exe i!= \"/usr/bin/sudo\") && (exe i!= \"/bin/sudo\")";
 
 /**
  * @brief Converts an enum to a string.
@@ -77,9 +79,24 @@ AuditSearchResultValues AuditSearch_InitMultipleSearchCriteria(AuditSearch* audi
         if (i == 0) {
             currentRule = AUSEARCH_RULE_CLEAR;
         }
-        if (ausearch_add_item(auditSearch->audit, AuditSearch_ConvertCriteriaToString(searchCriteria), "=", messageTypes[i], currentRule) == -1) {
-            result = AUDIT_SEARCH_EXCEPTION;
-            goto cleanup;
+       /*
+        * We want to monitor only local login operations but auditd "USER_AUTH" type includes sudo commands too.
+        * The following expression makes sure to include only login operations and ignore sudo commands.
+        */
+        if(strcmp(messageTypes[i], AUDIT_USER_AUTH_NAME) == 0){
+            char *error = NULL;
+            const char *expression = AUDIT_USER_AUTH_SEARECH_RULE;
+            if (ausearch_add_expression(auditSearch->audit, expression, &error, currentRule) == -1) {
+                result = AUDIT_SEARCH_EXCEPTION;
+                goto cleanup;
+            }
+        }
+        else
+        {
+            if (ausearch_add_item(auditSearch->audit, AuditSearch_ConvertCriteriaToString(searchCriteria), "=", messageTypes[i], currentRule) == -1) {
+                result = AUDIT_SEARCH_EXCEPTION;
+                goto cleanup;
+            }
         }
     }
 

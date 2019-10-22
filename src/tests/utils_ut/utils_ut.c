@@ -232,6 +232,31 @@ TEST_FUNCTION(Utils_ConcatenateToString_ExpectSuccess)
     ASSERT_IS_FALSE(result);
 }
 
+TEST_FUNCTION(Utils_CreateString_ExpectSuccess)
+{
+    ActionResult result;
+    char* dest;
+    
+    // test initialization from NULL
+    result = Utils_DuplicateString(&dest, NULL);
+    ASSERT_ARE_EQUAL(int, ACTION_OK, result);
+    ASSERT_IS_TRUE(NULL == dest);
+
+    char* input = "this is a message";
+    result = Utils_DuplicateString(&dest, input);
+    ASSERT_ARE_EQUAL(int, ACTION_OK, result);
+    ASSERT_ARE_EQUAL(char_ptr, input, dest);
+    if (dest != NULL) {
+        free(dest);
+        dest = NULL;
+    }
+
+    if (dest != NULL) {
+        free(dest);
+        dest = NULL;
+    }
+}
+
 TEST_FUNCTION(Utils_HexStringToByteArray_ExpectFail)
 {
     char* hexString = "DEADBEEF";
@@ -264,6 +289,48 @@ TEST_FUNCTION(Utils_HexStringToByteArray_ExpectSucess)
     ASSERT_ARE_EQUAL(char, 173, *(buffer+1));
     ASSERT_ARE_EQUAL(char, 190, *(buffer+2));
     ASSERT_ARE_EQUAL(char, 239, *(buffer+3));
+}
+
+TEST_FUNCTION(Utils_IsStringBlank_ExpectSuccess)
+{
+    ASSERT_IS_TRUE(Utils_IsStringBlank(NULL));
+    ASSERT_IS_TRUE(Utils_IsStringBlank(""));
+    ASSERT_IS_TRUE(Utils_IsStringBlank(" "));
+    ASSERT_IS_FALSE(Utils_IsStringBlank("a"));
+    ASSERT_IS_FALSE(Utils_IsStringBlank(" a "));
+}
+
+TEST_FUNCTION(Utils_IsStringNumeric_ExpectSuccess)
+{
+    ASSERT_IS_TRUE(Utils_IsStringNumeric("56"));
+    ASSERT_IS_FALSE(Utils_IsStringNumeric(NULL));
+    ASSERT_IS_FALSE(Utils_IsStringNumeric(" 546 "));
+    ASSERT_IS_FALSE(Utils_IsStringNumeric("123abc123"));
+}
+
+TEST_FUNCTION(Utils_StringFormat_ExpectSuccess)
+{
+    ActionResult result;
+    char* str = NULL;
+
+    result = Utils_StringFormat(NULL, &str);
+    ASSERT_ARE_EQUAL(char_ptr, NULL, str);
+    ASSERT_ARE_EQUAL(int, ACTION_FAILED, result);
+
+    result = Utils_StringFormat("a=%s", &str, "a");
+    ASSERT_ARE_EQUAL(char_ptr, "a=a", str);
+    free(str);
+    str = NULL;
+
+    result = Utils_StringFormat("a=%s", &str, "a", "b");
+    ASSERT_ARE_EQUAL(char_ptr, "a=a", str);
+    free(str);
+    str = NULL;
+
+    result = Utils_StringFormat("a=%s, b=%s",  &str, "a", "b");
+    ASSERT_ARE_EQUAL(char_ptr, "a=a, b=b", str);
+    free(str);
+    str = NULL;
 }
 
 END_TEST_SUITE(utils_ut)

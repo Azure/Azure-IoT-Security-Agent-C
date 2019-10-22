@@ -43,23 +43,23 @@ static bool aggregatorInitialized = false;
 
 /**
  * @brief parses down address and port of the current record
- * 
+ *
  * @param   auditSearch         The search audit.
  * @param   outputAddress       IP address of the current record.
  * @param   outputAddressSize   IP address buffer size of the current record.
  * @param   outputPort          Port of the current record.
  * @param   outputPortSize      Port size bufferof the current record.
- * 
+ *
  * @return EVENT_COLLECTOR_OK on success.
  */
 EventCollectorResult ConnectionCreationEventCollector_GetRemoteInformation(AuditSearch* auditSearch, char* outputAddress, uint32_t outputAddressSize, char* outputPort, uint32_t outputPortSize);
 
 /**
- * @brief Creates an event ready for aggregation 
- * 
+ * @brief Creates an event ready for aggregation
+ *
  * @param   auditSearch         The search audit.
  * @param   aggregator          Handle to event aggregator
- * 
+ *
  * @return EVENT_COLLECTOR_OK on success.
  */
 EventCollectorResult ConnectionCreationCollector_CreateEventForAgrregation(AuditSearch* auditSearch, EventAggregatorHandle aggregator);
@@ -86,7 +86,7 @@ EventCollectorResult ConnectionCreationEventCollector_GetRemoteInformation(Audit
     if (family != AF_INET && family != AF_INET6 ) {
         return EVENT_COLLECTOR_RECORD_FILTERED;
     }
-    
+
     uint16_t port = (saddrBytes[2] << 8) + saddrBytes[3];
     if (snprintf(outputPort, outputPortSize, "%u", port) <= 0) {
         return EVENT_COLLECTOR_EXCEPTION;
@@ -97,8 +97,8 @@ EventCollectorResult ConnectionCreationEventCollector_GetRemoteInformation(Audit
                 return EVENT_COLLECTOR_EXCEPTION;
         }
      } else if (family == AF_INET6 ) {
-        if (saddrSize < 24 || snprintf(outputAddress, outputAddressSize, IP_V6_FORMAT_STR, 
-                                                        saddrBytes[8], saddrBytes[9], saddrBytes[10], saddrBytes[11], 
+        if (saddrSize < 24 || snprintf(outputAddress, outputAddressSize, IP_V6_FORMAT_STR,
+                                                        saddrBytes[8], saddrBytes[9], saddrBytes[10], saddrBytes[11],
                                                         saddrBytes[12], saddrBytes[13], saddrBytes[14], saddrBytes[15],
                                                         saddrBytes[16], saddrBytes[17], saddrBytes[18], saddrBytes[19],
                                                         saddrBytes[20], saddrBytes[21], saddrBytes[22], saddrBytes[23]) != 39) {
@@ -120,7 +120,7 @@ EventCollectorResult ConnectionCreationEventCollector_GeneratePayload(AuditSearc
         return EVENT_COLLECTOR_RECORD_HAS_ERRORS;
     }
 
-    if (auditIntValue == AUDIT_CONNECTION_CREATION_SYSCALL_CONNECT) { 
+    if (auditIntValue == AUDIT_CONNECTION_CREATION_SYSCALL_CONNECT) {
         direction = CONNECTION_CREATION_DIRECTION_OUTBOUND_NAME;
     } else if (auditIntValue == AUDIT_CONNECTION_CREATION_SYSCALL_ACCEPT) {
         direction = CONNECTION_CREATION_DIRECTION_INBOUND_NAME;
@@ -176,7 +176,7 @@ EventCollectorResult ConnectionCreationEventCollector_GeneratePayload(AuditSearc
 EventCollectorResult ConnectionCreationCollector_CreateEventForAgrregation(AuditSearch* auditSearch, EventAggregatorHandle aggregator) {
     EventCollectorResult result = EVENT_COLLECTOR_OK;
     JsonObjectWriterHandle connectionCreateEventPayload = NULL;
-    
+
     if (JsonObjectWriter_Init(&connectionCreateEventPayload) != JSON_WRITER_OK) {
         result = EVENT_COLLECTOR_EXCEPTION;
         goto cleanup;
@@ -198,7 +198,7 @@ EventCollectorResult ConnectionCreationCollector_CreateEventForAgrregation(Audit
         goto cleanup;
     }
 
-    if (direction == AUDIT_CONNECTION_CREATION_SYSCALL_ACCEPT) { 
+    if (direction == AUDIT_CONNECTION_CREATION_SYSCALL_ACCEPT) {
         if (JsonObjectWriter_WriteInt(connectionCreateEventPayload, CONNECTION_CREATION_REMOTE_PORT_KEY, 0) != JSON_WRITER_OK) {
             result = EVENT_COLLECTOR_EXCEPTION;
             goto cleanup;
@@ -238,7 +238,7 @@ EventCollectorResult ConnectionCreationEventCollector_CreateSingleEvent(AuditSea
         goto cleanup;
     }
     time_t eventTime = (time_t)eventTimeInSeconds;
-    
+
     if (GenericEvent_AddMetadataWithTimes(connectionCreationEvent, EVENT_TRIGGERED_CATEGORY, CONNECTION_CREATION_NAME, EVENT_TYPE_SECURITY_VALUE, CONNECTION_CREATION_PAYLOAD_SCHEMA_VERSION, &eventTime) != EVENT_COLLECTOR_OK) {
         result = EVENT_COLLECTOR_EXCEPTION;
         goto cleanup;
@@ -256,7 +256,7 @@ EventCollectorResult ConnectionCreationEventCollector_CreateSingleEvent(AuditSea
     if (result != EVENT_COLLECTOR_OK) {
         goto cleanup;
     }
-    
+
     if (JsonArrayWriter_Init(&payloads) != JSON_WRITER_OK) {
         result = EVENT_COLLECTOR_EXCEPTION;
         goto cleanup;
@@ -267,11 +267,11 @@ EventCollectorResult ConnectionCreationEventCollector_CreateSingleEvent(AuditSea
         goto cleanup;
     }
 
-    result = GenericEvent_AddPayload(connectionCreationEvent, payloads); 
+    result = GenericEvent_AddPayload(connectionCreationEvent, payloads);
     if (result != EVENT_COLLECTOR_OK) {
         goto cleanup;
     }
-    
+
     uint32_t outputSize = 0;
     if (JsonObjectWriter_Serialize(connectionCreationEvent, &output, &outputSize) != JSON_WRITER_OK) {
         result = EVENT_COLLECTOR_OK;
@@ -322,7 +322,7 @@ EventCollectorResult ConnectionCreationEventCollector_GetEvents(SyncQueue* queue
         goto cleanup;
     }
     auditSearchInitialize = true;
- 
+
     AuditSearchResultValues hasNextResult = AuditSearch_GetNext(&auditSearch);
 
     bool aggregaionEnabled = false;
@@ -356,9 +356,9 @@ EventCollectorResult ConnectionCreationEventCollector_GetEvents(SyncQueue* queue
 
     if (aggregatorInitialized == true && EventAggregator_GetAggregatedEvents(aggregator, queue) != EVENT_AGGREGATOR_OK) {
         result = EVENT_COLLECTOR_EXCEPTION;
-        goto cleanup; 
+        goto cleanup;
     }
-   
+
 cleanup:
     if (auditSearchInitialize) {
         if (recordsWithError > 0) {
@@ -366,13 +366,13 @@ cleanup:
         }
 
         if (filteredRecords > 0) {
-            Logger_Information("%d records were fltered.", filteredRecords);
+            Logger_Information("%d records were filtered.", filteredRecords);
         }
 
         if (result != EVENT_COLLECTOR_OK) {
             Logger_Information("Setting up checkpoint even though connection creation did not finish successfuly.");
         }
-        
+
         if (AuditSearch_SetCheckpoint(&auditSearch) != AUDIT_SEARCH_OK) {
             result = EVENT_COLLECTOR_EXCEPTION;
         }
@@ -404,14 +404,14 @@ EventCollectorResult ConnectionCreationEventCollector_Init() {
     const char* acceptSyscall[] = {AUDIT_CONTROL_TYPE_ACCEPT};
     if (AuditControl_AddRule(&audit, acceptSyscall, 1, ARCHITECTURE_64, AUDIT_CONTROL_ON_SUCCESS_FILTER) != AUDIT_CONTROL_OK) {
         Logger_Error("Could not set audit to collect accept.");
-    }    
-    
+    }
+
     EventAggregatorConfiguration aggregatorConfiguration;
     aggregatorConfiguration.event_name = CONNECTION_CREATION_NAME;
     aggregatorConfiguration.event_type = EVENT_TYPE_SECURITY_VALUE;
     aggregatorConfiguration.iotEventType = EVENT_TYPE_CONNECTION_CREATE;
     aggregatorConfiguration.payload_schema_version = CONNECTION_CREATION_PAYLOAD_SCHEMA_VERSION;
-    
+
     if (EventAggregator_Init(&aggregator, &aggregatorConfiguration) != EVENT_AGGREGATOR_OK) {
         Logger_Error("Could not set initiate event aggregator");
     }

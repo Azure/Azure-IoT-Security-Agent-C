@@ -121,6 +121,7 @@ const char* LISTENING_PORTS_LOCAL_ADDRESS_KEY = "LocalAddress";
 const char* LISTENING_PORTS_LOCAL_PORT_KEY = "LocalPort";
 const char* LISTENING_PORTS_REMOTE_ADDRESS_KEY = "RemoteAddress";
 const char* LISTENING_PORTS_REMOTE_PORT_KEY = "RemotePort";
+const char* LISTENING_PORTS_PID_KEY = "Pid";
 
 
 const char* FIREWALL_RULES_NAME = "FirewallConfiguration";

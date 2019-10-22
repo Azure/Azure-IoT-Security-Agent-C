@@ -5,6 +5,7 @@
 #define CONSTS_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /**
  * Agent's name
@@ -47,6 +48,21 @@ extern uint32_t DEFAULT_HIGH_PRIORITY_MESSAGE_FREQUENCY;
 extern uint32_t DEFAULT_SNAPSHOT_FREQUENCY;
 
 /**
+ * Baseline custom checks enabled
+ */
+extern const bool DEFAULT_BASELINE_CUSTOM_CHECKS_ENABLED;
+
+/**
+ * Baseline custom checks file path
+ */
+extern const char* DEFAULT_BASELINE_CUSTOM_CHECKS_FILE_PATH;
+
+/**
+ * Baseline custom checks file hash
+ */
+extern const char* DEFAULT_BASELINE_CUSTOM_CHECKS_FILE_HASH;
+
+/**
  * The scheduler interval
  */
 extern const uint32_t SCHEDULER_INTERVAL;
@@ -65,5 +81,24 @@ extern const char CONFIGURATION_FILE[];
  * message billing multiple as denoted by Azure IoT hub
  */
 extern const uint32_t MESSAGE_BILLING_MULTIPLE;
+
+/**
+ * Protocols name
+ */
+extern const char* TCP_PROTOCOL;
+
+extern const char* TCP6_PROTOCOL;
+
+extern const char* UDP_PROTOCOL;
+
+extern const char* UDP6_PROTOCOL;
+
+extern const char* RAW_PROTOCOL;
+
+extern const char* RAW6_PROTOCOL;
+
+extern const uint32_t NUM_OF_PROTOCOLS;
+
+extern const char* PROTOCOL_TYPES[];
 
 #endif //CONSTS_H

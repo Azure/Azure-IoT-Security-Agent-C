@@ -18,11 +18,15 @@
 #include "os_utils/process_info_handler.h"
 #include "os_utils/process_utils.h"
 #include "synchronized_queue.h"
+#include "twin_configuration.h"
 #include "utils.h"
 #undef ENABLE_MOCKS
 
+#include "twin_configuration_consts.h"
+#include "twin_configuration_defs.h"
 #include "collectors/linux/baseline_collector.h"
 #include "message_schema_consts.h"
+
 
 static TEST_MUTEX_HANDLE test_serialize_mutex;
 static TEST_MUTEX_HANDLE g_dllByDll;
@@ -94,8 +98,6 @@ BEGIN_TEST_SUITE(baseline_collector_ut)
 
 TEST_SUITE_INITIALIZE(suite_init)
 {
-     
-
     test_serialize_mutex = TEST_MUTEX_CREATE();
     ASSERT_IS_NOT_NULL(test_serialize_mutex);
 
@@ -112,6 +114,7 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_UMOCK_ALIAS_TYPE(JsonArrayReaderHandle, void*);
     REGISTER_UMOCK_ALIAS_TYPE(EventCollectorResult, int);
     REGISTER_UMOCK_ALIAS_TYPE(QueueResultValues, int);
+    REGISTER_UMOCK_ALIAS_TYPE(TwinConfigurationResult, int);
 
     REGISTER_GLOBAL_MOCK_HOOK(JsonArrayReader_GetSize, Mocked_JsonArrayReader_GetSize);
     REGISTER_GLOBAL_MOCK_HOOK(JsonObjectReader_ReadString, Mocked_JsonObjectReader_ReadString);
@@ -186,6 +189,10 @@ TEST_FUNCTION(BaselineCollector_GetEvents_ExpectSuccess)
     STRICT_EXPECTED_CALL(JsonArrayReader_Deinit(IGNORED_PTR_ARG));
     STRICT_EXPECTED_CALL(JsonObjectReader_Deinit(IGNORED_PTR_ARG));
 
+    STRICT_EXPECTED_CALL(TwinConfiguration_GetBaselineCustomChecksEnabled(IGNORED_PTR_ARG)).SetReturn(TWIN_OK);
+    STRICT_EXPECTED_CALL(TwinConfiguration_GetBaselineCustomChecksFilePath(IGNORED_PTR_ARG)).SetReturn(TWIN_OK);
+    STRICT_EXPECTED_CALL(TwinConfiguration_GetBaselineCustomChecksFileHash(IGNORED_PTR_ARG)).SetReturn(TWIN_OK);
+
     STRICT_EXPECTED_CALL(GenericEvent_AddPayload(IGNORED_PTR_ARG, IGNORED_PTR_ARG)).SetReturn(EVENT_COLLECTOR_OK);
     STRICT_EXPECTED_CALL(JsonObjectWriter_Serialize(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG)).SetReturn(JSON_WRITER_OK);
     STRICT_EXPECTED_CALL(SyncQueue_PushBack(&mockedQueue, IGNORED_PTR_ARG, IGNORED_NUM_ARG)).SetReturn(QUEUE_OK);
@@ -244,6 +251,8 @@ TEST_FUNCTION(BaselineCollector_GetEvents_ExpectFailure)
     // no fail case
     STRICT_EXPECTED_CALL(JsonObjectReader_Deinit(IGNORED_PTR_ARG));
 
+    STRICT_EXPECTED_CALL(ProcessInfoHandler_Reset(IGNORED_PTR_ARG)).SetReturn(true);
+
     STRICT_EXPECTED_CALL(GenericEvent_AddPayload(IGNORED_PTR_ARG, IGNORED_PTR_ARG)).SetFailReturn(EVENT_COLLECTOR_EXCEPTION);
     STRICT_EXPECTED_CALL(JsonObjectWriter_Serialize(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG)).SetFailReturn(!JSON_WRITER_OK);
     STRICT_EXPECTED_CALL(SyncQueue_PushBack(&mockedQueue, IGNORED_PTR_ARG, IGNORED_NUM_ARG)).SetFailReturn(!QUEUE_OK);
@@ -253,13 +262,30 @@ TEST_FUNCTION(BaselineCollector_GetEvents_ExpectFailure)
     // no fail case
     STRICT_EXPECTED_CALL(JsonObjectWriter_Deinit(IGNORED_PTR_ARG));
 
-    
     umock_c_negative_tests_snapshot();
+
     int count = umock_c_negative_tests_call_count();
-    for (int i = 0; i < umock_c_negative_tests_call_count(); i++) {
-        if (i == 3 || i == 4 || i == 5 || i == 8 || i == 11 || i == 23 || i == 24 || i == 25 || i == 26 || i == 30 || i == 31) {
-            // skip deinit since they don't have a fail return
-            continue;
+
+    for (int i = 0; i < count; i++) {
+        switch (i) {
+            case 3:
+            case 4:
+            case 5:
+            case 8:
+            case 11:
+            case 23:
+            case 24:
+            case 25:
+            case 26:
+            case 27:
+            case 28:
+            case 29:
+            case 30:
+            case 31:
+            case 32:
+            case 33:
+                // skip deinit since they don't have a fail return
+                continue;
         }
         umock_c_negative_tests_reset();
         umock_c_negative_tests_fail_call(i);

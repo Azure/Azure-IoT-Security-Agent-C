@@ -16,6 +16,10 @@ set(${theseTestsName}_test_files
 set(${theseTestsName}_c_files
     ../../agent/src/collectors/linux/listening_ports_collector.c
     ../../agent/src/message_schema_consts.c
+    ../../agent/src/consts.c
+    ../../agent/src/utils.c
+    ../../azure-iot-sdk-c/c-utility/src/map.c
+    ../../azure-iot-sdk-c/c-utility/src/xlogging.c
 )
 
 umockc_build_test_artifacts(${theseTestsName} ON)

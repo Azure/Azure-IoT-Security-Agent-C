@@ -27,7 +27,7 @@ IOTHUB_CLIENT_TRANSPORT_PROVIDER protocol = AMQP_Protocol;
 
 /**
  * @brief This function is called upon receiving confirmation of the delivery of the IoT Hub message
- * 
+ *
  * @param   result                  The result of the callback
  * @param   userContextCallback     The user context for the callback.
  */
@@ -35,7 +35,7 @@ static void IoTHubAdapter_SendConfirmCallback(IOTHUB_CLIENT_CONFIRMATION_RESULT 
 
 /**
  * @brief This function is called upon receiving confirmation of setting up device twin reported properties
- * 
+ *
  * @param   statusCode      The statusCode of the callback
  * @param   userContext     The user context for the callback.
  */
@@ -43,7 +43,7 @@ static void IoTHubAdapter_SetReportedConfirmCallback(int statusCode, void* userC
 
 /**
  * @brief This function is called upon receiving updates about the status of the connection to IoT Hub.
- * 
+ *
  * @param   result                  The result of the connection.
  * @param   reason                  The reason for this callback.
  * @param   userContextCallback     The user context for the callback.
@@ -52,7 +52,7 @@ static void IoTHubAdapter_ConnectionStatusCallback(IOTHUB_CLIENT_CONNECTION_STAT
 
 /**
  * @brief This function is calles upon response to patch request send by the IoTHub services
- * 
+ *
  * @param   updateState             The current update state of the twin.
  * @param   payload                 The updates of the twin configuration.
  * @param   size                    The size of the payload.
@@ -62,38 +62,38 @@ static void IoTHubAdapter_DeviceTwinCallback(DEVICE_TWIN_UPDATE_STATE updateStat
 
 /**
  * @brief Initiate a new IoT hub module client internal state
- * 
+ *
  * @param   iotHubAdapter       The adapter to initiate.
  * @param   twinUpdatesQueue    The queue which will contain all the twin updates
- * 
+ *
  * @return true on success, false otherwise.
  */
 static bool IoTHubAdapter_Init_Internal(IoTHubAdapter* iotHubAdapter, SyncQueue* twinUpdatesQueue);
 
 /**
  * @brief Deinitialize the IoT hub module client internal state
- * 
+ *
  * @param   iotHubAdapter   The adapter to deinitiate.
  */
 static void IoTHubAdapter_Deinit_Internal(IoTHubAdapter* iotHubAdapter);
 
 /**
  * @brief Re-initiate a new IoT hub module client
- * 
+ *
  * @param   iotHubAdapter       The adapter to initiate.
  * @param   twinUpdatesQueue    The queue which will contain all the twin updates
- * 
+ *
  * @return true on success, false otherwise.
  */
 static bool IoTHubAdapter_Reinit(IoTHubAdapter* iotHubAdapter, SyncQueue* twinUpdatesQueue);
 
 /**
  * @brief Send message a-sync to the hub (internal function).
- * 
+ *
  * @param   iotHubAdapter   The adapter to send data with.
  * @param   data            The data to send.
  * @param   dataSize        The size of the data we want to send.
- * 
+ *
  * @return true on success, false otherwise.
  */
 static bool IoTHubAdapter_SendMessageAsync_Internal(IoTHubAdapter* iotHubAdapter, const void* data, size_t dataSize);
@@ -125,7 +125,7 @@ bool IoTHubAdapter_Init(IoTHubAdapter* iotHubAdapter, SyncQueue* twinUpdatesQueu
 bool IoTHubAdapter_Init_Internal(IoTHubAdapter* iotHubAdapter, SyncQueue* twinUpdatesQueue) {
     bool success = true;
     memset(iotHubAdapter, 0, sizeof(*iotHubAdapter));
-    
+
     iotHubAdapter->twinUpdatesQueue = twinUpdatesQueue;
 
     // Create the iothub handle here
@@ -154,7 +154,7 @@ bool IoTHubAdapter_Init_Internal(IoTHubAdapter* iotHubAdapter, SyncQueue* twinUp
         success = false;
         goto cleanup;
     }
-    
+
     if (IoTHubModuleClient_SetModuleTwinCallback(iotHubAdapter->moduleHandle, IoTHubAdapter_DeviceTwinCallback, iotHubAdapter) != IOTHUB_CLIENT_OK) {
         success = false;
         goto cleanup;
@@ -164,7 +164,7 @@ bool IoTHubAdapter_Init_Internal(IoTHubAdapter* iotHubAdapter, SyncQueue* twinUp
     if (!success){
         goto cleanup;
     }
-    
+
     iotHubAdapter->hubInitiated = true;
 
 cleanup:
@@ -222,9 +222,9 @@ bool IoTHubAdapter_ValidateAdapterConnectionStatus(IoTHubAdapter* adapter, bool*
     *isPermanent = false;
     if (adapter->connected) {
         return true;
-    } 
-    
-    if (adapter->connectionStatusReason == IOTHUB_CLIENT_CONNECTION_BAD_CREDENTIAL 
+    }
+
+    if (adapter->connectionStatusReason == IOTHUB_CLIENT_CONNECTION_BAD_CREDENTIAL
             || adapter->connectionStatusReason == IOTHUB_CLIENT_CONNECTION_NO_NETWORK) {
         *isPermanent = true;
     }
@@ -245,10 +245,10 @@ bool IoTHubAdapter_Connect(IoTHubAdapter* iotHubAdapter) {
 
     if (iotHubAdapter->connected && iotHubAdapter->hasTwinConfiguration) {
         return true;
-    } 
-    
+    }
+
     if (iotHubAdapter->connected) {
-        AgentErrors_LogError(ERROR_REMOTE_CONFIGURATION, SUBCODE_TIMEOUT, "Couldn't fetch remote configuration within timeout period");    
+        AgentErrors_LogError(ERROR_REMOTE_CONFIGURATION, SUBCODE_TIMEOUT, "Couldn't fetch remote configuration within timeout period");
     } else if (iotHubAdapter->connectionStatusReason == IOTHUB_CLIENT_CONNECTION_BAD_CREDENTIAL) {
         AgentErrors_LogError(ERROR_IOT_HUB_AUTHENTICATION, SUBCODE_UNAUTHORIZED, "Validate authentication configuration");
     } else if (iotHubAdapter->connectionStatusReason == IOTHUB_CLIENT_CONNECTION_NO_NETWORK) {
@@ -256,7 +256,7 @@ bool IoTHubAdapter_Connect(IoTHubAdapter* iotHubAdapter) {
     } else {
         AgentErrors_LogError(ERROR_IOT_HUB_AUTHENTICATION, SUBCODE_OTHER, "Couldn't connect to iot hub within timeout period");
     }
-    
+
     return false;
 }
 
@@ -347,7 +347,7 @@ static void IoTHubAdapter_SendConfirmCallback(IOTHUB_CLIENT_CONFIRMATION_RESULT 
 }
 
 static void IoTHubAdapter_ConnectionStatusCallback(IOTHUB_CLIENT_CONNECTION_STATUS result, IOTHUB_CLIENT_CONNECTION_STATUS_REASON reason, void* userContextCallback) {
-    if (userContextCallback == NULL) { 
+    if (userContextCallback == NULL) {
         Logger_Error("connection_status_callback error in user context");
         return;
     }
@@ -427,6 +427,6 @@ cleanup:
 
 static void IoTHubAdapter_SetReportedConfirmCallback(int statusCode, void* userContext) {
     if (statusCode != 200) {
-        Logger_Error("Couldn't set reproted propertis");
+        Logger_Error("Couldn't set reproted properties");
     }
 }

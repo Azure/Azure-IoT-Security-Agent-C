@@ -34,7 +34,7 @@ MOCKABLE_FUNCTION(, bool, ProcessInfoHandler_SwitchRealAndEffectiveUsers);
 MOCKABLE_FUNCTION(, bool, ProcessInfoHandler_ChangeToRoot, ProcessInfo*, processInfo);
 
 /**
- * @brief Reser the process privileges to its origin.
+ * @brief Reset the process privileges to its origin.
  * 
  * @param   processInfo     A process info stucrt. The same one that was used in the ChangeToRoot function.
  * 

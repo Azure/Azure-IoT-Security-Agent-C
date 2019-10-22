@@ -48,6 +48,7 @@ typedef struct _TwinConfigurationEventCollectors {
     uint32_t processCreateAggregationInterval;
     uint32_t connectionCreateAggregationInterval;
 
+
     LOCK_HANDLE lock;
     bool isLocked;
 } TwinConfigurationEventCollectors;
@@ -410,6 +411,7 @@ static TwinConfigurationResult TwinConfigurationEventCollectors_SetSingleBoolVal
     return result;
 }
 
+
 static TwinConfigurationResult TwinConfigurationEventCollectors_SetSingleUintTimeValue(JsonObjectReaderHandle propertiesReader, const char* key, uint32_t* field, uint32_t defaultValue) {
     TwinConfigurationResult result = TwinConfigurationUtils_GetConfigurationTimeValueFromJson(propertiesReader, key, field);
     if (result == TWIN_CONF_NOT_EXIST) {
@@ -573,10 +575,12 @@ static TwinConfigurationResult TwinConfigurationEventCollectors_SafeGetPrioritie
         result = TWIN_EXCEPTION;
         goto cleanup;
     }
+
     result = TwinConfigurationUtils_WriteStringConfigurationToJson(prioritiesJson, CONNECTION_CREATE_AGGREGATION_INTERVAL_KEY, iso8601Interval);
     if (result != TWIN_OK) {
         goto cleanup;
     }
+
 
 cleanup:
     return result;

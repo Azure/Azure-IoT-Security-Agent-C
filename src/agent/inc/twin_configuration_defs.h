@@ -34,6 +34,9 @@ typedef struct _TwinConfigurationBundleStatus {
     TwinConfigurationStatus highPriorityMessageFrequency;
     TwinConfigurationStatus snapshotFrequency;
     TwinConfigurationStatus eventPriorities;
+    TwinConfigurationStatus baselineCustomChecksEnabled;
+    TwinConfigurationStatus baselineCustomChecksFilePath;
+    TwinConfigurationStatus baselineCustomChecksFileHash;
  } TwinConfigurationBundleStatus;
 
  typedef enum _TwinConfigurationEventType {

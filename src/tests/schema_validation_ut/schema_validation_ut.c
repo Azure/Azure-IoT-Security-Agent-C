@@ -3,11 +3,13 @@
 
 #include "testrunnerswitcher.h"
 #include "macro_utils.h"
+#include "consts.h"
 
 #include "umock_c.h"
 #include "umocktypes_charptr.h"
 #include "umocktypes_bool.h"
 
+#include "azure_c_shared_utility/map.h"
 #include "agent_telemetry_counters.h"
 #include "schema_utils.h"
 #include "twin_configuration.h"
@@ -53,7 +55,7 @@ static void on_umock_c_error(UMOCK_C_ERROR_CODE error_code)
     ASSERT_FAIL(temp_str);
 }
 
-ListeningPortsIteratorResults Mock_ListenintPortsIterator_Init(ListeningPortsIteratorHandle* iterator, ListeningPortsType type) {
+ListeningPortsIteratorResults Mock_ListenintPortsIterator_Init(ListeningPortsIteratorHandle* iterator, const char* type) {
     *iterator = (ListeningPortsIteratorHandle)0x3;
     return LISTENING_PORTS_ITERATOR_OK;
 }
@@ -78,7 +80,6 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_UMOCK_ALIAS_TYPE(uint32_t, unsigned int);
     REGISTER_UMOCK_ALIAS_TYPE(int32_t, int);
     REGISTER_UMOCK_ALIAS_TYPE(ListeningPortsIteratorResults, int);
-    REGISTER_UMOCK_ALIAS_TYPE(ListeningPortsType, int);
     REGISTER_UMOCK_ALIAS_TYPE(ListeningPortsIteratorHandle, void*);
     REGISTER_UMOCK_ALIAS_TYPE(AgentQueueMeter, int);
     REGISTER_UMOCK_ALIAS_TYPE(AgentTelemetryProviderResult, int);
@@ -89,6 +90,8 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_UMOCK_ALIAS_TYPE(IptablesRulesIteratorHandle, void*);
     REGISTER_UMOCK_ALIAS_TYPE(UsersIteratorHandle, void*);
     REGISTER_UMOCK_ALIAS_TYPE(GroupsIteratorHandle, void*);    
+    REGISTER_UMOCK_ALIAS_TYPE(MAP_FILTER_CALLBACK, void*);
+    REGISTER_UMOCK_ALIAS_TYPE(MAP_HANDLE, void*);
 
     REGISTER_GLOBAL_MOCK_HOOK(ListenintPortsIterator_Init, Mock_ListenintPortsIterator_Init);
     REGISTER_GLOBAL_MOCK_HOOK(LocalConfiguration_GetAgentId, MockLocalConfiguration_GetAgentId);
@@ -115,24 +118,20 @@ TEST_FUNCTION_INITIALIZE(method_init)
 }
 
 TEST_FUNCTION(SchemaValidation_ListeningPorts)
-{
-    STRICT_EXPECTED_CALL(ListenintPortsIterator_Init(IGNORED_PTR_ARG, LISTENING_PORTS_TCP));
-    STRICT_EXPECTED_CALL(ListenintPortsIterator_GetNext(IGNORED_PTR_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_HAS_NEXT);
-    STRICT_EXPECTED_CALL(ListenintPortsIterator_GetLocalAddress(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_NUM_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_OK).CopyOutArgumentBuffer_address("1.1.1.1", 7);
-    STRICT_EXPECTED_CALL(ListenintPortsIterator_GetLocalPort(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_NUM_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_OK).CopyOutArgumentBuffer_port("1", 1);
-    STRICT_EXPECTED_CALL(ListenintPortsIterator_GetRemoteAddress(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_NUM_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_OK).CopyOutArgumentBuffer_address("2.2.2.2", 7);
-    STRICT_EXPECTED_CALL(ListenintPortsIterator_GetRemotePort(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_NUM_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_OK).CopyOutArgumentBuffer_port("2", 1);
-    STRICT_EXPECTED_CALL(ListenintPortsIterator_GetNext(IGNORED_PTR_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_NO_MORE_DATA);
-    STRICT_EXPECTED_CALL(ListenintPortsIterator_Deinit(IGNORED_PTR_ARG));
-    STRICT_EXPECTED_CALL(ListenintPortsIterator_Init(IGNORED_PTR_ARG, LISTENING_PORTS_UDP));
-    STRICT_EXPECTED_CALL(ListenintPortsIterator_GetNext(IGNORED_PTR_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_HAS_NEXT);
-    STRICT_EXPECTED_CALL(ListenintPortsIterator_GetLocalAddress(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_NUM_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_OK).CopyOutArgumentBuffer_address("3.3.3.3", 7);
-    STRICT_EXPECTED_CALL(ListenintPortsIterator_GetLocalPort(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_NUM_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_OK).CopyOutArgumentBuffer_port("3", 1);
-    STRICT_EXPECTED_CALL(ListenintPortsIterator_GetRemoteAddress(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_NUM_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_OK).CopyOutArgumentBuffer_address("4.4.4.4", 7);
-    STRICT_EXPECTED_CALL(ListenintPortsIterator_GetRemotePort(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_NUM_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_OK).CopyOutArgumentBuffer_port("4", 1);
-    STRICT_EXPECTED_CALL(ListenintPortsIterator_GetNext(IGNORED_PTR_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_NO_MORE_DATA);
-    STRICT_EXPECTED_CALL(ListenintPortsIterator_Deinit(IGNORED_PTR_ARG));
- 
+{   
+    size_t i = 0;
+    for(; i < NUM_OF_PROTOCOLS; i++){
+        STRICT_EXPECTED_CALL(ListenintPortsIterator_Init(IGNORED_PTR_ARG, PROTOCOL_TYPES[i]));
+        STRICT_EXPECTED_CALL(ListenintPortsIterator_GetNext(IGNORED_PTR_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_HAS_NEXT);
+        STRICT_EXPECTED_CALL(ListenintPortsIterator_GetLocalAddress(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_NUM_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_OK).CopyOutArgumentBuffer_address("1.1.1.1", 7);
+        STRICT_EXPECTED_CALL(ListenintPortsIterator_GetLocalPort(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_NUM_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_OK).CopyOutArgumentBuffer_port("1", 1);
+        STRICT_EXPECTED_CALL(ListenintPortsIterator_GetRemoteAddress(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_NUM_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_OK).CopyOutArgumentBuffer_address("2.2.2.2", 7);
+        STRICT_EXPECTED_CALL(ListenintPortsIterator_GetRemotePort(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_NUM_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_OK).CopyOutArgumentBuffer_port("2", 1);
+        STRICT_EXPECTED_CALL(ListenintPortsIterator_GetPid(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_NUM_ARG, IGNORED_PTR_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_OK).CopyOutArgumentBuffer_pid("", 1);
+        STRICT_EXPECTED_CALL(ListenintPortsIterator_GetNext(IGNORED_PTR_ARG)).SetReturn(LISTENING_PORTS_ITERATOR_NO_MORE_DATA);
+        STRICT_EXPECTED_CALL(ListenintPortsIterator_Deinit(IGNORED_PTR_ARG));
+    }
+   
     SyncQueue queue;
     ASSERT_ARE_EQUAL(int, QUEUE_OK, SyncQueue_Init(&queue, false));
     ASSERT_ARE_EQUAL(int, EVENT_COLLECTOR_OK, ListeningPortCollector_GetEvents(&queue));
