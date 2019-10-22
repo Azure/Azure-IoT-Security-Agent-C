@@ -1,0 +1,16 @@
+[submodule "umock-c"]
+	path = src/umock-c
+	url = https://github.com/Azure/umock-c.git
+[submodule "azure-iot-sdk-c"]
+	path = src/azure-iot-sdk-c
+	url = https://github.com/Azure/azure-iot-sdk-c.git
+	branch = master
+[submodule "Azure-IoT-Security"]
+	path = src/Azure-IoT-Security
+	url = https://github.com/Azure/Azure-IoT-Security.git
+[submodule "ctest"]
+	path = src/ctest
+	url = https://github.com/Azure/azure-ctest.git
+[submodule "testrunnerswitcher"]
+	path = src/testrunnerswitcher
+	url = https://github.com/Azure/azure-c-testrunnerswitcher.git
