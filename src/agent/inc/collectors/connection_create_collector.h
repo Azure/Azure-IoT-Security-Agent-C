@@ -1,8 +1,8 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#ifndef CONNECTION_CREATION_COLLECTOR_H
-#define CONNECTION_CREATION_COLLECTOR_H
+#ifndef CONNECTION_CREATE_COLLECTOR_H
+#define CONNECTION_CREATE_COLLECTOR_H
 
 #include <stdbool.h>
 
@@ -20,18 +20,18 @@
  * 
  * @return EVENT_COLLECTOR_OK on success, EVENT_COLLECTOR_EXCEPTION otherwise.
  */
-MOCKABLE_FUNCTION(, EventCollectorResult, ConnectionCreationEventCollector_GetEvents, SyncQueue*, queue);
+MOCKABLE_FUNCTION(, EventCollectorResult, ConnectionCreateEventCollector_GetEvents, SyncQueue*, queue);
 
 /**
  * @brief initializes the connection event collector
  * 
  * @return EVENT_COLLECTOR_OK on success, EVENT_COLLECTOR_EXCEPTION otherwise.
  */
-MOCKABLE_FUNCTION(, EventCollectorResult, ConnectionCreationEventCollector_Init);
+MOCKABLE_FUNCTION(, EventCollectorResult, ConnectionCreateEventCollector_Init);
 
 /**
  * @brief deinitializes the connection event collector
  */
-MOCKABLE_FUNCTION(, void, ConnectionCreationEventCollector_Deinit);
+MOCKABLE_FUNCTION(, void, ConnectionCreateEventCollector_Deinit);
 
-#endif //CONNECTION_CREATION_COLLECTOR_H
+#endif //CONNECTION_CREATE_COLLECTOR_H

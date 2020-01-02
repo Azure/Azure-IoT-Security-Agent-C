@@ -18,6 +18,7 @@ typedef struct _AuditControl {
     int audit;
     ProcessInfo processInfo;
     bool processInfoWasSet;
+    char* cpuArchitectureFilter;
 
 } AuditControl;
 
@@ -27,12 +28,6 @@ typedef enum _AuditControlResultValues {
     AUDIT_CONTROL_EXCEPTION
     
 } AuditControlResultValues;
-
-typedef enum _Architecture {
-    ARCHITECTURE_NONE,
-    ARCHITECTURE_32,
-    ARCHITECTURE_64
-} Architecture;
 
 extern const char AUDIT_CONTROL_ON_SUCCESS_FILTER[];
 extern const char AUDIT_CONTROL_TYPE_EXECVE[];
@@ -67,6 +62,6 @@ MOCKABLE_FUNCTION(, void, AuditControl_Deinit, AuditControl*, auditControl);
  * 
  * @return AUDIT_CONTROL_OK on success or an appropriate error. 
  */
-MOCKABLE_FUNCTION(, AuditControlResultValues, AuditControl_AddRule, AuditControl*, auditControl, const char**, msgTypeArray, size_t, msgTypeArraySize, Architecture, architecture, const char*, extraFilter);
+MOCKABLE_FUNCTION(, AuditControlResultValues, AuditControl_AddRule, AuditControl*, auditControl, const char**, msgTypeArray, size_t, msgTypeArraySize, const char*, extraFilter);
 
 #endif //AUDIT_CONTROL_H

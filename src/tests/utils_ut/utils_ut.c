@@ -308,6 +308,18 @@ TEST_FUNCTION(Utils_IsStringNumeric_ExpectSuccess)
     ASSERT_IS_FALSE(Utils_IsStringNumeric("123abc123"));
 }
 
+TEST_FUNCTION(Utils_Substring_ExpectSuccess)
+{
+    char* src = NULL;
+    char* dest = NULL;
+    Utils_Substring("Hello", &dest, 1, 1);
+    ASSERT_ARE_EQUAL(char_ptr, "ell", dest);
+    ASSERT_IS_FALSE(Utils_Substring(src, &dest, 4, 1));
+    ASSERT_IS_FALSE(Utils_Substring(NULL, &dest, 1, 2));
+    free(dest);
+    free(src);
+}
+
 TEST_FUNCTION(Utils_StringFormat_ExpectSuccess)
 {
     ActionResult result;

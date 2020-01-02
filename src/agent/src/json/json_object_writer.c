@@ -6,11 +6,10 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include "parson.h"
-
 #include "json/json_writer.h"
 
+static JsonWriterResult JsonObjectWriter_GetValueOfType(JsonObjectWriter* writer, const char* key, JSON_Value_Type type, JSON_Value ** outObject);
 
 JsonWriterResult JsonObjectWriter_Init(JsonObjectWriterHandle* writer) {
     JsonWriterResult result = JSON_WRITER_OK;
@@ -185,5 +184,42 @@ bool JsonObjectWriter_Compare(JsonObjectWriterHandle a, JsonObjectWriterHandle b
 JsonWriterResult JsonObjectWriter_GetSize(JsonObjectWriterHandle handle, uint32_t* size) {
     JsonObjectWriter* writer = (JsonObjectWriter*)handle;
     *size = json_object_get_count(writer->rootObject);
+    return JSON_WRITER_OK;
+}
+
+
+JsonWriterResult JsonObjectWriter_StepIn(JsonObjectWriterHandle handle, const char* key) {
+    JsonObjectWriter* writer = (JsonObjectWriter*)handle;
+    JSON_Value* val = NULL;
+    JsonWriterResult result = JsonObjectWriter_GetValueOfType(writer, key, JSONObject, &val);
+    if (result != JSON_WRITER_OK) {
+        return result;
+    }
+
+    JSON_Object* newRoot = json_value_get_object(val);
+    if (newRoot == NULL) {
+        return JSON_WRITER_EXCEPTION;
+    }
+    writer->rootObject = newRoot;
+    return JSON_WRITER_OK;
+}
+
+
+static JsonWriterResult JsonObjectWriter_GetValueOfType(JsonObjectWriter* writer, const char* key, JSON_Value_Type type, JSON_Value** outObject){
+    if (json_object_dothas_value(writer->rootObject, key) != true){
+        return JSON_WRITER_EXCEPTION;
+    }
+
+    JSON_Value* value = json_object_dotget_value(writer->rootObject, key);
+    if (value == NULL) {
+        return JSON_WRITER_EXCEPTION;
+    }
+
+    JSON_Value_Type actualType = json_value_get_type(value);
+    if (actualType == JSONError || actualType == JSONNull || actualType != type) {
+        return JSON_WRITER_EXCEPTION;
+    } 
+
+    *outObject = value;
     return JSON_WRITER_OK;
 }

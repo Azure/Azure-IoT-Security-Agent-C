@@ -11,6 +11,7 @@ _omsBaselineExecutablePath="https://ascforiot.blob.core.windows.net/public/"
 _omsBaselineX64="omsbaseline-linux-amd64"
 _omsBaselineI386="omsbaseline-linux-386"
 _omsBaselineARMv7="omsbaseline-linux-arm-v7"
+_omsBaselineARMv8="omsbaseline-linux-arm64-v8"
 _omsAudits="oms_audits.xml"
 _omsBaseline="omsbaseline"
 _identity=
@@ -18,6 +19,7 @@ _authenticationMethod=
 _filePath=
 _deviceId=
 _hostName=
+_reboot=false
 
 usage()
 {
@@ -39,6 +41,7 @@ usage()
     echo " -f   --file-path                  Path to a file from which data related to the authentication method should be read (the key or certificate)."
     echo " -hn  --host-name                  IoT hub's host name."
     echo " -di  --device-id                  Id of the device the agent is beind installed on (as defined in the IoT hub)."
+    echo " -r   --reboot					 Specifies whether to do an automatic reboot when installation finished."
 }
 
 wgetAndExitOnFail(){
@@ -99,8 +102,11 @@ installagent()
         wgetAndExitOnFail "${_omsBaselineExecutablePath}${_omsBaselineX64}"  $baselinePath
         ;;
     'armv7l')
-		wgetAndExitOnFail "${_omsBaselineExecutablePath}${_omsBaselineARMv7}"  $baselinePath
-		;;
+        wgetAndExitOnFail "${_omsBaselineExecutablePath}${_omsBaselineARMv7}"  $baselinePath
+        ;;
+    'aarch64')
+        wgetAndExitOnFail "${_omsBaselineExecutablePath}${_omsBaselineARMv8}"  $baselinePath
+        ;;
     'i368')
         wgetAndExitOnFail "${_omsBaselineExecutablePath}${_omsBaselineI386}" $baselinePath
 		;;
@@ -144,8 +150,11 @@ installagent()
 
     #start the service
     systemctl start $_serviceTemplateName
-
+    
     echo agent installation finished
+
+    setupIMAPolicy
+
 }
 
 validate_installation_params()
@@ -186,6 +195,23 @@ validate_installation_params()
     then
         echo "cannot intall the agent, please check the validity of the supplied parameters"
         exit 1
+    fi
+}
+
+setupIMAPolicy(){
+	mkdir -p /etc/ima
+	echo "audit func=BPRM_CHECK mask=MAY_EXEC" > /etc/ima/ima-policy
+    if [[ $_reboot == true ]]
+    then
+        sudo reboot;
+    else
+        echo "A reboot is required to complete agent installation."
+        read  -p "Do you wish to do it now?[y/n]" answer
+        case $answer in
+            [Yy]* ) sudo reboot; break;;
+            [Nn]* ) echo "To take full advantage of the security agent capabilities, make sure you reboot your device later.";;
+            * ) echo "Please answer yes or no.";;
+        esac
     fi
 }
 
@@ -235,6 +261,9 @@ while [ "$1" != "" ]; do
 		-di | --device-id)          shift
 									_deviceId=$1
 									;;
+        -r | --reboot )             shift
+                                    _reboot=true
+                                    ;;
         -u | --uninstall )          _mode="uninstall"
                                     ;;
         -i | --install )            _mode="install"

@@ -54,11 +54,6 @@ AuditSearchResultValues AuditSearch_InitMultipleSearchCriteria(AuditSearch* audi
         goto cleanup;
     }
 
-    if (Utils_CreateStringCopy(&auditSearch->checkpointFile, checkpointFile) == false) {
-        result = AUDIT_SEARCH_EXCEPTION;
-        goto cleanup;
-    }
-
     auditSearch->audit = auparse_init(AUSOURCE_LOGS, NULL);
     if (auditSearch->audit == NULL) {
         Logger_Warning("Can not initiate auparse.");
@@ -83,26 +78,37 @@ AuditSearchResultValues AuditSearch_InitMultipleSearchCriteria(AuditSearch* audi
         * We want to monitor only local login operations but auditd "USER_AUTH" type includes sudo commands too.
         * The following expression makes sure to include only login operations and ignore sudo commands.
         */
-        if(strcmp(messageTypes[i], AUDIT_USER_AUTH_NAME) == 0){
+        if (searchCriteria == AUDIT_SEARCH_CRITERIA_TYPE && strcmp(messageTypes[i], AUDIT_USER_AUTH_NAME) == 0) {
             char *error = NULL;
             const char *expression = AUDIT_USER_AUTH_SEARECH_RULE;
             if (ausearch_add_expression(auditSearch->audit, expression, &error, currentRule) == -1) {
                 result = AUDIT_SEARCH_EXCEPTION;
                 goto cleanup;
             }
-        }
-        else
-        {
+        } else if (searchCriteria == AUDIT_SEARCH_CRITERIA_SYSCALL) {
+            // Compare syscalls only by name, to avoid syscall number arch differences 
+            if (ausearch_add_interpreted_item(auditSearch->audit, AuditSearch_ConvertCriteriaToString(searchCriteria), "=", messageTypes[i], currentRule) == -1) {
+                result = AUDIT_SEARCH_EXCEPTION;
+                goto cleanup;
+            }
+        } else {
             if (ausearch_add_item(auditSearch->audit, AuditSearch_ConvertCriteriaToString(searchCriteria), "=", messageTypes[i], currentRule) == -1) {
                 result = AUDIT_SEARCH_EXCEPTION;
                 goto cleanup;
             }
         }
     }
+    
+    if (checkpointFile != NULL){
+        if (!(Utils_CreateStringCopy(&auditSearch->checkpointFile, checkpointFile))) {
+            result = AUDIT_SEARCH_EXCEPTION;
+            goto cleanup;
+        }
 
-    if (AuditSearch_AddCheckpointToSearch(auditSearch) != AUDIT_SEARCH_OK) {
-        result = AUDIT_SEARCH_EXCEPTION;
-        goto cleanup;
+        if (AuditSearch_AddCheckpointToSearch(auditSearch) != AUDIT_SEARCH_OK) {
+            result = AUDIT_SEARCH_EXCEPTION;
+            goto cleanup;
+        }
     }
 
     if (ausearch_set_stop(auditSearch->audit, AUSEARCH_STOP_EVENT) == -1) {

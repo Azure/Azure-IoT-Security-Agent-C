@@ -30,6 +30,7 @@ const char* EVENT_TYPE_DIAGNOSTIC_VALUE = "Diagnostic";
 const char* PROCESS_CREATION_NAME = "ProcessCreate";
 const char* PROCESS_CREATION_PAYLOAD_SCHEMA_VERSION = "1.0";
 const char* PROCESS_CREATION_EXECUTABLE_KEY = "Executable";
+const char* PROCESS_CREATION_EXECUTABLE_HASH_KEY = "Hash";
 const char* PROCESS_CREATION_PROCESS_ID_KEY = "ProcessId";
 const char* PROCESS_CREATION_PARENT_PROCESS_ID_KEY = "ParentProcessId";
 const char* PROCESS_CREATION_USER_ID_KEY = "UserId";

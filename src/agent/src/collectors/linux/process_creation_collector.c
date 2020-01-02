@@ -19,10 +19,17 @@
 #include "os_utils/linux/audit/audit_search.h"
 #include "twin_configuration_defs.h"
 #include "utils.h"
+#include "azure_c_shared_utility/map.h"
+
 
 static const char AUDIT_PROCESS_CREATION_TYPE[] = "EXECVE";
+static const char AUDIT_PROCESS_INTEGRITY_TYPE[] = "INTEGRITY_RULE";
+static const char* AUDIT_PROCESS_CREATION_TYPES[] = {AUDIT_PROCESS_CREATION_TYPE, AUDIT_PROCESS_INTEGRITY_TYPE};
+static uint32_t AUDIT_USER_CREATION_TYPES_COUNT = sizeof(AUDIT_PROCESS_CREATION_TYPES) / sizeof(AUDIT_PROCESS_CREATION_TYPES[0]);
 static const char AUDIT_PROCESS_CREATION_CHECKPOINT_FILE[] = "/var/tmp/processCreationCheckpoint";
 static const char AUDIT_PROCESS_CREATION_EXECUTEABLE[] = "exe";
+static const char AUDIT_PROCESS_CREATION_EXECUTEABLE_HASH[] = "hash";
+static const char AUDIT_PROCESS_CREATION_EXECUTEABLE_PATH[] = "file";
 static const char AUDIT_PROCESS_CREATION_USER_ID[] = "uid";
 static const char AUDIT_PROCESS_CREATION_PROCESS_ID[] = "pid";
 static const char AUDIT_PROCESS_CREATION_PARENT_PROCESS_ID[] = "ppid";
@@ -30,6 +37,7 @@ static const int AUDIT_EXECVE_RECORD_TYPE = 1309; //FIXME: we need to see that i
 static const char AUDIT_ARGC[] = "argc";
 
 #define AUDIT_MAX_PARAM_LEN 10
+static MAP_HANDLE executableHashMap = NULL;
 static EventAggregatorHandle aggregator = NULL;
 static bool aggregatorInitialized = false;
 
@@ -73,13 +81,30 @@ EventCollectorResult ProcessCreationCollector_CreateSingleEvent(AuditSearch* aud
  */
 EventCollectorResult ProcessCreationCollector_CreateEventForAgrregation(AuditSearch* auditSearch, EventAggregatorHandle aggregator);
 
+/**
+ * @brief Populates the executables hash dictionary
+ * 
+ * @return EVENT_COLLECTOR_OK on success.
+ */
+EventCollectorResult ProcessCreationCollector_PopulateExecutableHashMap();
+
+/**
+ * @brief Adds an entry to executable hash map. 
+ *        In case that the key(executableName) exists it updates its value.
+ * 
+ * @param   auditSearch         The search audit.
+ * 
+ * @return EVENT_COLLECTOR_OK on success.
+ */
+EventCollectorResult ProcessCreationCollector_AddEntryToExecutableHashMap(AuditSearch* auditSearch);
+
 EventCollectorResult ProcessCreationCollector_GetEvents(SyncQueue* queue) {
     EventCollectorResult result = EVENT_COLLECTOR_OK;
     bool auditSearchInitialize = false;
     AuditSearch auditSearch;
     uint32_t recordsWithError = 0;
 
-    if (AuditSearch_Init(&auditSearch, AUDIT_SEARCH_CRITERIA_TYPE, AUDIT_PROCESS_CREATION_TYPE, AUDIT_PROCESS_CREATION_CHECKPOINT_FILE) != AUDIT_SEARCH_OK) {
+    if (AuditSearch_InitMultipleSearchCriteria(&auditSearch, AUDIT_SEARCH_CRITERIA_TYPE, AUDIT_PROCESS_CREATION_TYPES, AUDIT_USER_CREATION_TYPES_COUNT, AUDIT_PROCESS_CREATION_CHECKPOINT_FILE) != AUDIT_SEARCH_OK) {
         result = EVENT_COLLECTOR_EXCEPTION;
         goto cleanup;
     }
@@ -145,9 +170,16 @@ cleanup:
 EventCollectorResult ProcessCreationCollector_GeneratePayload(AuditSearch* auditSearch, JsonObjectWriterHandle processEventPayload) {
     
     EventCollectorResult result = EVENT_COLLECTOR_OK;
-    result = GenericAuditEvent_HandleInterpretStringValue(processEventPayload, auditSearch, AUDIT_PROCESS_CREATION_EXECUTEABLE, PROCESS_CREATION_EXECUTABLE_KEY, false);
-    if (result != EVENT_COLLECTOR_OK) {
-        return result;
+    const char* hash = NULL;
+    const char* executable = NULL;
+    JsonObjectWriterHandle extraDetails = NULL;
+
+    if (AuditSearch_InterpretString(auditSearch, AUDIT_PROCESS_CREATION_EXECUTEABLE, &executable) != AUDIT_SEARCH_OK){
+        return EVENT_COLLECTOR_EXCEPTION;
+    }
+    if (JsonObjectWriter_WriteString(processEventPayload, PROCESS_CREATION_EXECUTABLE_KEY, executable) != JSON_WRITER_OK) {
+        result = EVENT_COLLECTOR_EXCEPTION;
+        goto cleanup;
     }
 
     result = ProcessCreationCollector_ReadCommandLine(auditSearch, processEventPayload);
@@ -170,7 +202,33 @@ EventCollectorResult ProcessCreationCollector_GeneratePayload(AuditSearch* audit
         return result;
     }
 
-    return EVENT_COLLECTOR_OK;
+    result = ProcessCreationCollector_AddEntryToExecutableHashMap(auditSearch);
+    if (result != EVENT_COLLECTOR_OK){
+        return result;
+    }
+
+    hash = Map_GetValueFromKey(executableHashMap, executable);
+    hash = (hash != NULL) ? hash : "";
+    if (JsonObjectWriter_Init(&extraDetails) != JSON_WRITER_OK) {
+        result = EVENT_COLLECTOR_EXCEPTION;
+        goto cleanup;
+    }
+
+    if (JsonObjectWriter_WriteString(extraDetails, PROCESS_CREATION_EXECUTABLE_HASH_KEY, hash) != JSON_WRITER_OK) {
+        result = EVENT_COLLECTOR_EXCEPTION;
+        goto cleanup;
+    }
+    if (JsonObjectWriter_WriteObject(processEventPayload, EXTRA_DETAILS_KEY, extraDetails) != JSON_WRITER_OK) {
+        result = EVENT_COLLECTOR_EXCEPTION;
+        goto cleanup;
+    }
+
+cleanup:
+    if (extraDetails != NULL) {
+        JsonObjectWriter_Deinit(extraDetails);
+    }    
+
+    return result;
 }
 
 EventCollectorResult ProcessCreationCollector_CreateEventForAgrregation(AuditSearch* auditSearch, EventAggregatorHandle aggregator) {
@@ -354,10 +412,73 @@ cleanup:
     return result;
 }
 
+EventCollectorResult ProcessCreationCollector_PopulateExecutableHashMap() {
+    EventCollectorResult result = EVENT_COLLECTOR_OK;
+    executableHashMap = Map_Create(NULL);
+    bool auditSearchInitialize = false;
+    AuditSearch auditSearch;
+
+    if (executableHashMap == NULL){
+        result = EVENT_COLLECTOR_EXCEPTION;
+        goto cleanup;
+    }
+
+    if (AuditSearch_Init(&auditSearch, AUDIT_SEARCH_CRITERIA_TYPE, AUDIT_PROCESS_INTEGRITY_TYPE, NULL) != AUDIT_SEARCH_OK){
+        result = EVENT_COLLECTOR_EXCEPTION;
+        goto cleanup;
+    }
+    auditSearchInitialize = true;
+
+    AuditSearchResultValues hasNextResult = AuditSearch_GetNext(&auditSearch);
+    while (hasNextResult == AUDIT_SEARCH_HAS_MORE_DATA) {
+        result = ProcessCreationCollector_AddEntryToExecutableHashMap(&auditSearch);
+        if (result != EVENT_COLLECTOR_OK) {
+            goto cleanup;
+        }
+        hasNextResult = AuditSearch_GetNext(&auditSearch);
+    }
+
+cleanup:
+    if (auditSearchInitialize){
+        AuditSearch_Deinit(&auditSearch);
+    }
+    return result;
+
+}
+
+EventCollectorResult ProcessCreationCollector_AddEntryToExecutableHashMap(AuditSearch* auditSearch) {
+    AuditSearchResultValues result = AUDIT_SEARCH_OK;
+    const char* executable = NULL;
+    const char* hash = NULL;
+
+    result = AuditSearch_InterpretString(auditSearch, AUDIT_PROCESS_CREATION_EXECUTEABLE_HASH, &hash);
+    if (result != AUDIT_SEARCH_OK && result != AUDIT_SEARCH_FIELD_DOES_NOT_EXIST) {
+        return EVENT_COLLECTOR_EXCEPTION;
+    }
+    if (hash != NULL){
+        char* Hash = NULL;
+        // hash value starts with "\"sha1:" and ends with "\"" so we want to clean those characters
+        if(!Utils_Substring(hash, &Hash, 6,1)){
+            return EVENT_COLLECTOR_EXCEPTION;
+        }
+        result = AuditSearch_InterpretString(auditSearch, AUDIT_PROCESS_CREATION_EXECUTEABLE_PATH, &executable);
+        if (result != AUDIT_SEARCH_OK && result != AUDIT_SEARCH_FIELD_DOES_NOT_EXIST) {
+            return EVENT_COLLECTOR_EXCEPTION;
+        }
+        MAP_RESULT mapResult = Map_AddOrUpdate(executableHashMap, executable, Hash);
+        if (mapResult != MAP_OK && mapResult != MAP_KEYEXISTS){
+            result = EVENT_COLLECTOR_EXCEPTION;
+        }
+    }
+
+    return EVENT_COLLECTOR_OK;
+}
+
 EventCollectorResult ProcessCreationCollector_Init() {
     AuditControl audit;
     bool auditInitiated = false;
     EventCollectorResult result = EVENT_COLLECTOR_OK;
+    size_t count = 0;
 
     if (AuditControl_Init(&audit) != AUDIT_CONTROL_OK) {
         Logger_Error("Could not init audit control instace.");
@@ -368,12 +489,8 @@ EventCollectorResult ProcessCreationCollector_Init() {
 
     const char* processSyscalls[] = {AUDIT_CONTROL_TYPE_EXECVE, AUDIT_CONTROL_TYPE_EXECVEAT};
 
-    if (AuditControl_AddRule(&audit, processSyscalls, 2, ARCHITECTURE_64, NULL) != AUDIT_CONTROL_OK) {
-        Logger_Error("Could not set audit to collect execve for b64.");
-    }
-
-    if (AuditControl_AddRule(&audit, processSyscalls, 2, ARCHITECTURE_32, NULL) != AUDIT_CONTROL_OK) {
-        Logger_Error("Could not set audit to collect execve for b32.");
+    if (AuditControl_AddRule(&audit, processSyscalls, 2, NULL) != AUDIT_CONTROL_OK) {
+        Logger_Error("Could not set audit to collect execve.");
     }
 
     EventAggregatorConfiguration aggregatorConfiguration;
@@ -387,6 +504,17 @@ EventCollectorResult ProcessCreationCollector_Init() {
     }
 
     aggregatorInitialized = true;
+    if(ProcessCreationCollector_PopulateExecutableHashMap() != EVENT_COLLECTOR_OK){
+        result = EVENT_COLLECTOR_EXCEPTION;
+        goto cleanup;
+    }
+    if (!(Utils_GetMapSize(executableHashMap, &count))){
+        result = EVENT_COLLECTOR_EXCEPTION;
+        goto cleanup;
+    }
+    if (count == 0){
+        Logger_Error("Could not collect auditd integrity_rule events. It might happen if you haven't rebooted the machine after the agent installation.");
+    }
 
 cleanup:
     if (auditInitiated) {
@@ -400,5 +528,8 @@ void ProcessCreationCollector_Deinit() {
     if (aggregatorInitialized) {
         EventAggregator_Deinit(aggregator);
         aggregator = NULL;
+    }
+    if (executableHashMap != NULL){
+        Map_Destroy(executableHashMap);
     }
 }

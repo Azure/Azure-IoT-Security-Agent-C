@@ -269,11 +269,18 @@ EventAggregatorResult EventAggregator_AddAggregationMetadata(JsonObjectWriterHan
     const uint32_t bufferSize = MAX_TIME_AS_STRING_LENGTH + 1;
     char timeString[bufferSize];
     JsonObjectWriterHandle metadata = NULL;
-    if (JsonObjectWriter_Init(&metadata) != JSON_WRITER_OK) {
-        result = EVENT_AGGREGATOR_EXCEPTION;
-        goto cleanup;
-    }
+    bool payloadHasExtraDetails = false;
 
+    if(JsonObjectWriter_StepIn(payload, EXTRA_DETAILS_KEY) != JSON_WRITER_OK){
+        if (JsonObjectWriter_Init(&metadata) != JSON_WRITER_OK) {
+            result = EVENT_AGGREGATOR_EXCEPTION;
+            goto cleanup;
+        }
+    } else {
+        payloadHasExtraDetails = true;
+        metadata = payload;
+    }
+    
     if (JsonObjectWriter_WriteInt(metadata, HIT_COUNT_KEY, hitCount) != JSON_WRITER_OK) {
         result = EVENT_AGGREGATOR_EXCEPTION;
         goto cleanup;
@@ -322,14 +329,15 @@ EventAggregatorResult EventAggregator_AddAggregationMetadata(JsonObjectWriterHan
         result = EVENT_AGGREGATOR_EXCEPTION;
         goto cleanup;
     }
-
-    if (JsonObjectWriter_WriteObject(payload, EXTRA_DETAILS_KEY, metadata) != JSON_WRITER_OK) {
-        result = EVENT_AGGREGATOR_EXCEPTION;
-        goto cleanup;
+    if(!payloadHasExtraDetails){
+        if (JsonObjectWriter_WriteObject(payload, EXTRA_DETAILS_KEY, metadata) != JSON_WRITER_OK) {
+            result = EVENT_AGGREGATOR_EXCEPTION;
+            goto cleanup;
+        }
     }
 cleanup:
     
-    if (metadata != NULL) {
+    if (metadata != NULL && !payloadHasExtraDetails) {
         JsonObjectWriter_Deinit(metadata);
     }
     return result;

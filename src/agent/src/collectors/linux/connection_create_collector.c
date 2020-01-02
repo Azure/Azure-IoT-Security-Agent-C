@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#include "collectors/connection_creation_collector.h"
+#include "collectors/connection_create_collector.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -22,7 +22,12 @@
 static const char SUPPORTED_PROTOCOL_TCP[] = "tcp";
 
 // connect, accept
-static const char* AUDIT_CONNECTION_CREATION_SYSCALLS[] = {"42", "43"};
+static const char AUDIT_CONNECTION_CREATION_SYSCALL_CONNECT[] = "connect";
+static const char AUDIT_CONNECTION_CREATION_SYSCALL_ACCEPT[] = "accept";
+static const char* AUDIT_CONNECTION_CREATION_SYSCALLS[] = {
+    AUDIT_CONNECTION_CREATION_SYSCALL_CONNECT,
+    AUDIT_CONNECTION_CREATION_SYSCALL_ACCEPT
+};
 static uint32_t AUDIT_CONNECTION_CREATION_SYSCALLS_COUNT = sizeof(AUDIT_CONNECTION_CREATION_SYSCALLS) / sizeof(AUDIT_CONNECTION_CREATION_SYSCALLS[0]);
 static const char AUDIT_CONNECTION_CREATION_CHECKPOINT_FILE[] = "/var/tmp/connectionCreationCheckpoint";
 
@@ -32,14 +37,17 @@ static const char AUDIT_CONNECTION_CREATION_PROCESS_ID[] = "pid";
 static const char AUDIT_CONNECTION_CREATION_USER_ID[] = "uid";
 static const char AUDIT_CONNECTION_CREATION_SYSCALL[] = "syscall";
 static const char AUDIT_CONNECTION_CREATION_REMOTE_SOCKET_ADDRESS[] = "saddr";
-static const int AUDIT_CONNECTION_CREATION_SYSCALL_CONNECT = 42;
-static const int AUDIT_CONNECTION_CREATION_SYSCALL_ACCEPT = 43;
 
 static const char IP_V4_FORMAT_STR[] = "%u.%u.%u.%u";
 static const char IP_V6_FORMAT_STR[] = "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x";
 
 static EventAggregatorHandle aggregator = NULL;
 static bool aggregatorInitialized = false;
+
+typedef enum {
+    CONNECTION_DIRECTION_OUTBOUND,
+    CONNECTION_DIRECTION_INBOUND
+} ConnectionDirection;
 
 /**
  * @brief parses down address and port of the current record
@@ -52,7 +60,7 @@ static bool aggregatorInitialized = false;
  *
  * @return EVENT_COLLECTOR_OK on success.
  */
-EventCollectorResult ConnectionCreationEventCollector_GetRemoteInformation(AuditSearch* auditSearch, char* outputAddress, uint32_t outputAddressSize, char* outputPort, uint32_t outputPortSize);
+EventCollectorResult ConnectionCreateEventCollector_GetRemoteInformation(AuditSearch* auditSearch, char* outputAddress, uint32_t outputAddressSize, char* outputPort, uint32_t outputPortSize);
 
 /**
  * @brief Creates an event ready for aggregation
@@ -62,9 +70,19 @@ EventCollectorResult ConnectionCreationEventCollector_GetRemoteInformation(Audit
  *
  * @return EVENT_COLLECTOR_OK on success.
  */
-EventCollectorResult ConnectionCreationCollector_CreateEventForAgrregation(AuditSearch* auditSearch, EventAggregatorHandle aggregator);
+EventCollectorResult ConnectionCreationCollector_CreateEventForAggregation(AuditSearch* auditSearch, EventAggregatorHandle aggregator);
 
-EventCollectorResult ConnectionCreationEventCollector_GetRemoteInformation(AuditSearch* auditSearch, char* outputAddress, uint32_t outputAddressSize, char* outputPort, uint32_t outputPortSize) {
+/**
+ * @brief Parse the connection direction from an AuditSearch record.
+ *
+ * @param   auditSearch         The search audit.
+ * @param   aggregator          Out param. The connection direction
+ *
+ * @return EVENT_COLLECTOR_OK on success.
+ */
+EventCollectorResult ConnectionCreationCollector_GetDirection(AuditSearch* auditSearch, ConnectionDirection* direction);
+
+EventCollectorResult ConnectionCreateEventCollector_GetRemoteInformation(AuditSearch* auditSearch, char* outputAddress, uint32_t outputAddressSize, char* outputPort, uint32_t outputPortSize) {
     if (outputAddressSize < AUDIT_CONNECTION_CREATION_MAX_BUFF || outputPortSize < AUDIT_CONNECTION_CREATION_MAX_BUFF) {
         Logger_Error("Received too small buffer for address initialization");
         return EVENT_COLLECTOR_EXCEPTION;
@@ -109,27 +127,24 @@ EventCollectorResult ConnectionCreationEventCollector_GetRemoteInformation(Audit
     return EVENT_COLLECTOR_OK;
 }
 
-EventCollectorResult ConnectionCreationEventCollector_GeneratePayload(AuditSearch* auditSearch, JsonObjectWriterHandle connectionCreationEventPayload) {
-    int auditIntValue = 0;
-    const char* direction = NULL;
+EventCollectorResult ConnectionCreateEventCollector_GeneratePayload(AuditSearch* auditSearch, JsonObjectWriterHandle connectionCreationEventPayload) {
+    const char* directionString = NULL;
+    ConnectionDirection direction = CONNECTION_DIRECTION_OUTBOUND;
     EventCollectorResult result = EVENT_COLLECTOR_OK;
     char remoteAddress[AUDIT_CONNECTION_CREATION_MAX_BUFF];
     char remotePort[AUDIT_CONNECTION_CREATION_MAX_BUFF];
-
-    if (AuditSearch_ReadInt(auditSearch, AUDIT_CONNECTION_CREATION_SYSCALL, &auditIntValue) != AUDIT_SEARCH_OK) {
-        return EVENT_COLLECTOR_RECORD_HAS_ERRORS;
-    }
-
-    if (auditIntValue == AUDIT_CONNECTION_CREATION_SYSCALL_CONNECT) {
-        direction = CONNECTION_CREATION_DIRECTION_OUTBOUND_NAME;
-    } else if (auditIntValue == AUDIT_CONNECTION_CREATION_SYSCALL_ACCEPT) {
-        direction = CONNECTION_CREATION_DIRECTION_INBOUND_NAME;
-    } else {
-        Logger_Error("different syscall than accept/connect, this shouldn't happen");
+    
+    if (ConnectionCreationCollector_GetDirection(auditSearch, &direction) != EVENT_COLLECTOR_OK) {
         return EVENT_COLLECTOR_EXCEPTION;
     }
 
-    result = ConnectionCreationEventCollector_GetRemoteInformation(auditSearch, remoteAddress, AUDIT_CONNECTION_CREATION_MAX_BUFF, remotePort, AUDIT_CONNECTION_CREATION_MAX_BUFF);
+    if (direction == CONNECTION_DIRECTION_OUTBOUND) {
+        directionString = CONNECTION_CREATION_DIRECTION_OUTBOUND_NAME;
+    } else {
+        directionString = CONNECTION_CREATION_DIRECTION_INBOUND_NAME;
+    }
+
+    result = ConnectionCreateEventCollector_GetRemoteInformation(auditSearch, remoteAddress, AUDIT_CONNECTION_CREATION_MAX_BUFF, remotePort, AUDIT_CONNECTION_CREATION_MAX_BUFF);
     if (result != EVENT_COLLECTOR_OK) {
         return result;
     }
@@ -138,7 +153,7 @@ EventCollectorResult ConnectionCreationEventCollector_GeneratePayload(AuditSearc
         return EVENT_COLLECTOR_EXCEPTION;
     }
 
-    if (JsonObjectWriter_WriteString(connectionCreationEventPayload, CONNECTION_CREATION_DIRECTION_KEY, direction) != JSON_WRITER_OK) {
+    if (JsonObjectWriter_WriteString(connectionCreationEventPayload, CONNECTION_CREATION_DIRECTION_KEY, directionString) != JSON_WRITER_OK) {
         return EVENT_COLLECTOR_RECORD_HAS_ERRORS;
     }
 
@@ -173,16 +188,17 @@ EventCollectorResult ConnectionCreationEventCollector_GeneratePayload(AuditSearc
     return EVENT_COLLECTOR_OK;
 }
 
-EventCollectorResult ConnectionCreationCollector_CreateEventForAgrregation(AuditSearch* auditSearch, EventAggregatorHandle aggregator) {
+EventCollectorResult ConnectionCreationCollector_CreateEventForAggregation(AuditSearch* auditSearch, EventAggregatorHandle aggregator) {
     EventCollectorResult result = EVENT_COLLECTOR_OK;
     JsonObjectWriterHandle connectionCreateEventPayload = NULL;
+    ConnectionDirection direction;
 
     if (JsonObjectWriter_Init(&connectionCreateEventPayload) != JSON_WRITER_OK) {
         result = EVENT_COLLECTOR_EXCEPTION;
         goto cleanup;
     }
 
-    result = ConnectionCreationEventCollector_GeneratePayload(auditSearch, connectionCreateEventPayload);
+    result = ConnectionCreateEventCollector_GeneratePayload(auditSearch, connectionCreateEventPayload);
     if (result != EVENT_COLLECTOR_OK) {
         goto cleanup;
     }
@@ -192,13 +208,12 @@ EventCollectorResult ConnectionCreationCollector_CreateEventForAgrregation(Audit
         goto cleanup;
     }
 
-    int direction;
-    if (AuditSearch_ReadInt(auditSearch, AUDIT_CONNECTION_CREATION_SYSCALL, &direction) != AUDIT_SEARCH_OK) {
+    if (ConnectionCreationCollector_GetDirection(auditSearch, &direction) != EVENT_COLLECTOR_OK) {
         result = EVENT_COLLECTOR_RECORD_HAS_ERRORS;
         goto cleanup;
     }
 
-    if (direction == AUDIT_CONNECTION_CREATION_SYSCALL_ACCEPT) {
+    if (direction == CONNECTION_DIRECTION_INBOUND) {
         if (JsonObjectWriter_WriteInt(connectionCreateEventPayload, CONNECTION_CREATION_REMOTE_PORT_KEY, 0) != JSON_WRITER_OK) {
             result = EVENT_COLLECTOR_EXCEPTION;
             goto cleanup;
@@ -219,7 +234,7 @@ cleanup:
 }
 
 
-EventCollectorResult ConnectionCreationEventCollector_CreateSingleEvent(AuditSearch* auditSearch, SyncQueue* queue) {
+EventCollectorResult ConnectionCreateEventCollector_CreateSingleEvent(AuditSearch* auditSearch, SyncQueue* queue) {
     EventCollectorResult result = EVENT_COLLECTOR_OK;
 
     JsonObjectWriterHandle connectionCreationEvent = NULL;
@@ -249,7 +264,7 @@ EventCollectorResult ConnectionCreationEventCollector_CreateSingleEvent(AuditSea
         goto cleanup;
     }
 
-    result = ConnectionCreationEventCollector_GeneratePayload(auditSearch, connectionCreationEventPayload);
+    result = ConnectionCreateEventCollector_GeneratePayload(auditSearch, connectionCreationEventPayload);
     if (result == EVENT_COLLECTOR_RECORD_HAS_ERRORS) {
         goto cleanup;
     }
@@ -277,6 +292,8 @@ EventCollectorResult ConnectionCreationEventCollector_CreateSingleEvent(AuditSea
         result = EVENT_COLLECTOR_OK;
         goto cleanup;
     }
+
+    Logger_Debug("Generated single connection event:\n%s", output);
 
     QueueResultValues qResult = SyncQueue_PushBack(queue, output, outputSize);
     if (qResult == QUEUE_MAX_MEMORY_EXCEEDED) {
@@ -309,7 +326,7 @@ cleanup:
     return result;
 }
 
-EventCollectorResult ConnectionCreationEventCollector_GetEvents(SyncQueue* queue) {
+EventCollectorResult ConnectionCreateEventCollector_GetEvents(SyncQueue* queue) {
     EventCollectorResult result = EVENT_COLLECTOR_OK;
     bool auditSearchInitialize = false;
     AuditSearch auditSearch;
@@ -332,9 +349,9 @@ EventCollectorResult ConnectionCreationEventCollector_GetEvents(SyncQueue* queue
 
     while (hasNextResult == AUDIT_SEARCH_HAS_MORE_DATA) {
         if (aggregaionEnabled == true) {
-            result = ConnectionCreationCollector_CreateEventForAgrregation(&auditSearch, aggregator);
+            result = ConnectionCreationCollector_CreateEventForAggregation(&auditSearch, aggregator);
         } else {
-            result = ConnectionCreationEventCollector_CreateSingleEvent(&auditSearch, queue);
+            result = ConnectionCreateEventCollector_CreateSingleEvent(&auditSearch, queue);
         }
 
         if (result == EVENT_COLLECTOR_EXCEPTION) {
@@ -382,7 +399,7 @@ cleanup:
     return result;
 }
 
-EventCollectorResult ConnectionCreationEventCollector_Init() {
+EventCollectorResult ConnectionCreateEventCollector_Init() {
     AuditControl audit;
     bool auditInitiated = false;
     EventCollectorResult result = EVENT_COLLECTOR_OK;
@@ -394,16 +411,9 @@ EventCollectorResult ConnectionCreationEventCollector_Init() {
     }
     auditInitiated = true;
 
-    // outbound connections
-    const char* connectSyscall[] = {AUDIT_CONTROL_TYPE_CONNECT};
-    if (AuditControl_AddRule(&audit, connectSyscall, 1, ARCHITECTURE_64, AUDIT_CONTROL_ON_SUCCESS_FILTER) != AUDIT_CONTROL_OK) {
-        Logger_Error("Could not set audit to collect connect.");
-    }
-
-    // inbound connections
-    const char* acceptSyscall[] = {AUDIT_CONTROL_TYPE_ACCEPT};
-    if (AuditControl_AddRule(&audit, acceptSyscall, 1, ARCHITECTURE_64, AUDIT_CONTROL_ON_SUCCESS_FILTER) != AUDIT_CONTROL_OK) {
-        Logger_Error("Could not set audit to collect accept.");
+    const char* connectionSyscalls[] = { AUDIT_CONTROL_TYPE_CONNECT, AUDIT_CONTROL_TYPE_ACCEPT };
+    if (AuditControl_AddRule(&audit, connectionSyscalls, 2, AUDIT_CONTROL_ON_SUCCESS_FILTER) != AUDIT_CONTROL_OK) {
+        Logger_Error("Could not set audit to collect connect / accept.");
     }
 
     EventAggregatorConfiguration aggregatorConfiguration;
@@ -425,9 +435,31 @@ cleanup:
     return result;
 }
 
-void ConnectionCreationEventCollector_Deinit() {
+void ConnectionCreateEventCollector_Deinit() {
     if (aggregatorInitialized) {
         EventAggregator_Deinit(aggregator);
         aggregator = NULL;
     }
+}
+
+EventCollectorResult ConnectionCreationCollector_GetDirection(AuditSearch* auditSearch, ConnectionDirection* direction) {
+    const char* syscallName = NULL;
+    if (auditSearch == NULL || direction == NULL) {
+        return EVENT_COLLECTOR_EXCEPTION;
+    }
+
+    if (AuditSearch_InterpretString(auditSearch, AUDIT_CONNECTION_CREATION_SYSCALL, &syscallName) != AUDIT_SEARCH_OK) {
+        return EVENT_COLLECTOR_EXCEPTION;
+    }
+
+    if (strcmp(syscallName, AUDIT_CONNECTION_CREATION_SYSCALL_CONNECT) == 0) {
+        *direction = CONNECTION_DIRECTION_OUTBOUND;
+    } else if (strcmp(syscallName, AUDIT_CONNECTION_CREATION_SYSCALL_ACCEPT) == 0) {
+        *direction = CONNECTION_DIRECTION_INBOUND;
+    } else {
+        Logger_Error("different syscall than accept/connect, this shouldn't happen");
+        return EVENT_COLLECTOR_EXCEPTION;
+    }
+
+    return EVENT_COLLECTOR_OK;
 }

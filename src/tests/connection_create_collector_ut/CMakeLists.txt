@@ -7,14 +7,14 @@ include("../../cmake_config/utilityFunctions.cmake")
 include_directories(../../agent/inc)
 add_definitions(-DDISABLE_LOGS)
 
-set(theseTestsName connection_creation_collector_ut)
+set(theseTestsName connection_create_collector_ut)
 
 set(${theseTestsName}_test_files
     ${theseTestsName}.c
 )
 
 set(${theseTestsName}_c_files
-    ../../agent/src/collectors/linux/connection_creation_collector.c
+    ../../agent/src/collectors/linux/connection_create_collector.c
     ../../agent/src/message_schema_consts.c
     ../../agent/src/utils.c
 )

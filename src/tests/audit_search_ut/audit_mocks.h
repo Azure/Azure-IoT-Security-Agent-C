@@ -18,3 +18,4 @@ MOCKABLE_FUNCTION(, int, auparse_next_event, auparse_state_t*, au);
 MOCKABLE_FUNCTION(, int, auparse_first_record, auparse_state_t*, au);
 MOCKABLE_FUNCTION(, const char*, auparse_get_record_text, auparse_state_t*, au);
 MOCKABLE_FUNCTION(, int, auparse_next_record, auparse_state_t*, au);
+MOCKABLE_FUNCTION(, int, ausearch_add_interpreted_item, auparse_state_t*, au, const char*, field, const char*, op, const char*, value, ausearch_rule_t, how);

@@ -51,7 +51,7 @@ EventCollectorResult BaselineCollector_GetEvents(SyncQueue* queue) {
     return EVENT_COLLECTOR_OK;
 }
 
-EventCollectorResult ConnectionCreationEventCollector_GetEvents(SyncQueue* queue) {
+EventCollectorResult ConnectionCreateEventCollector_GetEvents(SyncQueue* queue) {
     return EVENT_COLLECTOR_OK;
 }
 
@@ -86,10 +86,10 @@ EventCollectorResult ProcessCreationCollector_Init() {
     return EVENT_COLLECTOR_OK;
 }
 
-EventCollectorResult ConnectionCreationEventCollector_Init() {
+EventCollectorResult ConnectionCreateEventCollector_Init() {
     return EVENT_COLLECTOR_OK;
 }
 
 void ProcessCreationCollector_Deinit() { }
 
-void ConnectionCreationEventCollector_Deinit() { }
+void ConnectionCreateEventCollector_Deinit() { }

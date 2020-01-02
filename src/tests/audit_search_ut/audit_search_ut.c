@@ -122,7 +122,7 @@ TEST_FUNCTION(AuditSearch_InitSysCall_ExpectSuccess)
 
     STRICT_EXPECTED_CALL(ProcessInfoHandler_ChangeToRoot(&search.processInfo)).SetReturn(true);
     STRICT_EXPECTED_CALL(auparse_init(AUSOURCE_LOGS, NULL)).SetReturn(mockedAudit);
-    STRICT_EXPECTED_CALL(ausearch_add_item(mockedAudit, "syscall", "=", MESSAGE_TYPE, AUSEARCH_RULE_CLEAR)).SetReturn(0);
+    STRICT_EXPECTED_CALL(ausearch_add_interpreted_item(mockedAudit, "syscall", "=", MESSAGE_TYPE, AUSEARCH_RULE_CLEAR)).SetReturn(0);
     STRICT_EXPECTED_CALL(FileUtils_ReadFile(CHECKPOINT_PATH, IGNORED_PTR_ARG, sizeof(time_t), false)).SetReturn(FILE_UTILS_FILE_NOT_FOUND);
     STRICT_EXPECTED_CALL(ausearch_set_stop(mockedAudit, AUSEARCH_STOP_EVENT)).SetReturn(0);
     STRICT_EXPECTED_CALL(TimeUtils_GetCurrentTime()).SetReturn(MOCKED_SEARCH_TIME);

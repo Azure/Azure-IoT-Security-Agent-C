@@ -262,7 +262,7 @@ bool IoTHubAdapter_Connect(IoTHubAdapter* iotHubAdapter) {
 
 bool IoTHubAdapter_SendMessageAsync(IoTHubAdapter* iotHubAdapter, const void* data, size_t dataSize) {
     if (iotHubAdapterLock == NULL || Lock(iotHubAdapterLock) != LOCK_OK) {
-        Logger_Error("Send message failed. Could not aquire lock");
+        Logger_Error("Send message failed. Could not acquire lock");
         return false;
     }
 
@@ -302,19 +302,19 @@ static bool IoTHubAdapter_SendMessageAsync_Internal(IoTHubAdapter* iotHubAdapter
     messageHandle = IoTHubMessage_CreateFromByteArray(data, dataSize);
 
     if (messageHandle == NULL) {
-        Logger_Warning("unable to create a new IoTHubMessage");
+        Logger_Warning("Unable to create a new IoTHubMessage");
         success = false;
         goto cleanup;
     }
 
     if (IoTHubMessage_SetAsSecurityMessage(messageHandle) != IOTHUB_MESSAGE_OK) {
-        Logger_Warning("failed to set message as security message");
+        Logger_Warning("Failed to set message as security message");
         success = false;
         goto cleanup;
     }
 
     if (IoTHubModuleClient_SendEventAsync(iotHubAdapter->moduleHandle, messageHandle, IoTHubAdapter_SendConfirmCallback, iotHubAdapter) != IOTHUB_CLIENT_OK) {
-        Logger_Warning("failed to hand over the message to IoTHubClient");
+        Logger_Warning("Failed to hand over the message to IoTHubClient");
         success = false;
         goto cleanup;
     }

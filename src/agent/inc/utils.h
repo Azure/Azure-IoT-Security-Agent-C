@@ -9,6 +9,7 @@
 
 #include "macro_utils.h"
 #include "umock_c_prod.h"
+#include "azure_c_shared_utility/map.h"
 
 /**
  * Utils action result
@@ -176,6 +177,29 @@ MOCKABLE_FUNCTION(, bool, Utils_IsStringBlank, const char*, s);
  * @return true iff string contains numbers only.
  */
 MOCKABLE_FUNCTION(, bool, Utils_IsStringNumeric, char*, string);
+
+/**
+ * @brief   Generates substring of the given string according to given offsets.
+ *          Allocates memory for dest and copies into it the substring.
+ * 
+ * @param   src             string
+ * @param   dest            Pointer for the newly allocated string
+ * @param   startOffset     start offset
+ * @param   endOffset       end offset
+ *
+ * @return true on success, false otherwise.
+ */
+MOCKABLE_FUNCTION(, bool, Utils_Substring, const char*, src, char**, dest, uint32_t, startOffset, uint32_t, endOffset);
+
+/**
+ * @brief   Returns map size in the given size pointer.
+ * 
+ * @param   handle          Map_Hanle pointer
+ * @param   size            out param: the returned map size
+ * 
+ * @return true on success, false otherwise.
+ */
+MOCKABLE_FUNCTION(, bool, Utils_GetMapSize, MAP_HANDLE, handle, size_t*, size);
 
 /**
  * @brief   allocates memory for output and copies into it the formatted string.

@@ -20,7 +20,7 @@
 #include "synchronized_queue.h"
 #undef ENABLE_MOCKS
 
-#include "collectors/connection_creation_collector.h"
+#include "collectors/connection_create_collector.h"
 #include "message_schema_consts.h"
 
 const char AUDIT_CONTROL_ON_SUCCESS_FILTER[] = "success=1";
@@ -59,15 +59,10 @@ AuditSearchResultValues Mocked_AuditSearch_InterpretString(AuditSearch* auditSea
     } else if (strcmp(fieldName, "proctitle") == 0) {
         *output = MOCKED_CMD;
         return AUDIT_SEARCH_OK;
-    }
-}
-
-AuditSearchResultValues Mocked_AuditSearch_ReadInt(AuditSearch* auditSearch, const char* fieldName, int* output) {
-    if (strcmp(fieldName, "syscall") == 0) {
-        *output = MOCKED_CONNECT_SYSCAL;
+    } else if (strcmp(fieldName, "syscall") == 0) {
+        *output = AUDIT_CONTROL_TYPE_CONNECT;
         return AUDIT_SEARCH_OK;
     }
-    return AUDIT_SEARCH_OK;
 }
 
 static bool isAggregationEnabled = false;
@@ -90,7 +85,7 @@ AuditSearchResultValues Mocked_AuditSearch_ReadString(AuditSearch* auditSearch, 
     return AUDIT_SEARCH_OK;
 }
 
-BEGIN_TEST_SUITE(connection_creation_collector_ut)
+BEGIN_TEST_SUITE(connection_create_collector_ut)
 
 TEST_SUITE_INITIALIZE(suite_init)
 {
@@ -117,7 +112,6 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_UMOCK_ALIAS_TYPE(EventAggregatorResult, int);
 
     REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_InterpretString, Mocked_AuditSearch_InterpretString);
-    REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_ReadInt, Mocked_AuditSearch_ReadInt);
     REGISTER_GLOBAL_MOCK_HOOK(EventAggregator_IsAggregationEnabled, Mocked_EventAggregator_IsAggregationEnabled);
     REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_ReadString, Mocked_AuditSearch_ReadString);
 }
@@ -125,7 +119,6 @@ TEST_SUITE_INITIALIZE(suite_init)
 TEST_SUITE_CLEANUP(suite_cleanup)
 {
     REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_InterpretString, NULL);
-    REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_ReadInt, NULL);
     REGISTER_GLOBAL_MOCK_HOOK(EventAggregator_IsAggregationEnabled, NULL);
     REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_ReadString, NULL);
     umock_c_deinit();
@@ -139,7 +132,7 @@ TEST_FUNCTION_INITIALIZE(method_init)
     MOCKED_SOCKET_ADDRESS = MOCKED_INTET_SOCKET_ADDRESS;
 }
 
-TEST_FUNCTION(ConnectionCreationEventCollector_GetEventsWithInetConnection_AggregationEnabled_ExpectSuccess)
+TEST_FUNCTION(ConnectionCreateEventCollector_GetEventsWithInetConnection_AggregationEnabled_ExpectSuccess)
 {
     SyncQueue mockedQueue;
     isAggregationEnabled = true;
@@ -149,7 +142,7 @@ TEST_FUNCTION(ConnectionCreationEventCollector_GetEventsWithInetConnection_Aggre
     STRICT_EXPECTED_CALL(AuditSearch_GetNext(IGNORED_PTR_ARG)).SetReturn(AUDIT_SEARCH_HAS_MORE_DATA);
     STRICT_EXPECTED_CALL(EventAggregator_IsAggregationEnabled(IGNORED_PTR_ARG, IGNORED_PTR_ARG));
     STRICT_EXPECTED_CALL(JsonObjectWriter_Init(IGNORED_PTR_ARG)).SetReturn(JSON_WRITER_OK);
-    STRICT_EXPECTED_CALL(AuditSearch_ReadInt(IGNORED_PTR_ARG, "syscall", IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(AuditSearch_InterpretString(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG));
     STRICT_EXPECTED_CALL(AuditSearch_ReadString(IGNORED_PTR_ARG, "saddr", IGNORED_PTR_ARG));
     STRICT_EXPECTED_CALL(JsonObjectWriter_WriteString(IGNORED_PTR_ARG, CONNECTION_CREATION_PROTOCOL_KEY, "tcp")).SetReturn(JSON_WRITER_OK);
     STRICT_EXPECTED_CALL(JsonObjectWriter_WriteString(IGNORED_PTR_ARG, CONNECTION_CREATION_DIRECTION_KEY, CONNECTION_CREATION_DIRECTION_OUTBOUND_NAME)).SetReturn(JSON_WRITER_OK);
@@ -161,7 +154,7 @@ TEST_FUNCTION(ConnectionCreationEventCollector_GetEventsWithInetConnection_Aggre
     STRICT_EXPECTED_CALL(GenericAuditEvent_HandleStringValue(IGNORED_PTR_ARG, IGNORED_PTR_ARG, "uid", CONNECTION_CREATION_USER_ID_KEY, false)).SetReturn(EVENT_COLLECTOR_OK);
 
     STRICT_EXPECTED_CALL(JsonObjectWriter_WriteInt(IGNORED_PTR_ARG, CONNECTION_CREATION_PROCESS_ID_KEY, 0));
-    STRICT_EXPECTED_CALL(AuditSearch_ReadInt(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(AuditSearch_InterpretString(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG));
     STRICT_EXPECTED_CALL(EventAggregator_AggregateEvent(IGNORED_PTR_ARG, IGNORED_PTR_ARG));
 
     STRICT_EXPECTED_CALL(AuditSearch_GetNext(IGNORED_PTR_ARG)).SetReturn(AUDIT_SEARCH_NO_MORE_DATA);
@@ -169,13 +162,13 @@ TEST_FUNCTION(ConnectionCreationEventCollector_GetEventsWithInetConnection_Aggre
     STRICT_EXPECTED_CALL(AuditSearch_SetCheckpoint(IGNORED_PTR_ARG)).SetReturn(AUDIT_SEARCH_OK);
     STRICT_EXPECTED_CALL(AuditSearch_Deinit(IGNORED_PTR_ARG)); 
 
-    EventCollectorResult result = ConnectionCreationEventCollector_GetEvents(&mockedQueue);
+    EventCollectorResult result = ConnectionCreateEventCollector_GetEvents(&mockedQueue);
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 
     ASSERT_ARE_EQUAL(int, EVENT_COLLECTOR_OK, result);
 }
 
-TEST_FUNCTION(ConnectionCreationEventCollector_GetEventsWithInetConnection_AggregationEnabled_FailOnAggregate_ExpectFail)
+TEST_FUNCTION(ConnectionCreateEventCollector_GetEventsWithInetConnection_AggregationEnabled_FailOnAggregate_ExpectFail)
 {
     SyncQueue mockedQueue;
     isAggregationEnabled = true;
@@ -185,7 +178,7 @@ TEST_FUNCTION(ConnectionCreationEventCollector_GetEventsWithInetConnection_Aggre
     STRICT_EXPECTED_CALL(AuditSearch_GetNext(IGNORED_PTR_ARG)).SetReturn(AUDIT_SEARCH_HAS_MORE_DATA);
     STRICT_EXPECTED_CALL(EventAggregator_IsAggregationEnabled(IGNORED_PTR_ARG, IGNORED_PTR_ARG));
     STRICT_EXPECTED_CALL(JsonObjectWriter_Init(IGNORED_PTR_ARG)).SetReturn(JSON_WRITER_OK);
-    STRICT_EXPECTED_CALL(AuditSearch_ReadInt(IGNORED_PTR_ARG, "syscall", IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(AuditSearch_InterpretString(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG));
     STRICT_EXPECTED_CALL(AuditSearch_ReadString(IGNORED_PTR_ARG, "saddr", IGNORED_PTR_ARG));
     STRICT_EXPECTED_CALL(JsonObjectWriter_WriteString(IGNORED_PTR_ARG, CONNECTION_CREATION_PROTOCOL_KEY, "tcp")).SetReturn(JSON_WRITER_OK);
     STRICT_EXPECTED_CALL(JsonObjectWriter_WriteString(IGNORED_PTR_ARG, CONNECTION_CREATION_DIRECTION_KEY, CONNECTION_CREATION_DIRECTION_OUTBOUND_NAME)).SetReturn(JSON_WRITER_OK);
@@ -197,13 +190,13 @@ TEST_FUNCTION(ConnectionCreationEventCollector_GetEventsWithInetConnection_Aggre
     STRICT_EXPECTED_CALL(GenericAuditEvent_HandleStringValue(IGNORED_PTR_ARG, IGNORED_PTR_ARG, "uid", CONNECTION_CREATION_USER_ID_KEY, false)).SetReturn(EVENT_COLLECTOR_OK);
 
     STRICT_EXPECTED_CALL(JsonObjectWriter_WriteInt(IGNORED_PTR_ARG, CONNECTION_CREATION_PROCESS_ID_KEY, 0));
-    STRICT_EXPECTED_CALL(AuditSearch_ReadInt(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(AuditSearch_InterpretString(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG));
     STRICT_EXPECTED_CALL(EventAggregator_AggregateEvent(IGNORED_PTR_ARG, IGNORED_PTR_ARG)).SetReturn(EVENT_AGGREGATOR_EXCEPTION);
 
     STRICT_EXPECTED_CALL(AuditSearch_SetCheckpoint(IGNORED_PTR_ARG)).SetReturn(AUDIT_SEARCH_OK);
     STRICT_EXPECTED_CALL(AuditSearch_Deinit(IGNORED_PTR_ARG)); 
 
-    EventCollectorResult result = ConnectionCreationEventCollector_GetEvents(&mockedQueue);
+    EventCollectorResult result = ConnectionCreateEventCollector_GetEvents(&mockedQueue);
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 
     ASSERT_ARE_EQUAL(int, EVENT_COLLECTOR_EXCEPTION, result);
@@ -222,7 +215,7 @@ void TestGetEvents_ExpectSuccess(char* hexInputString, char* ipAddress, char* po
     STRICT_EXPECTED_CALL(GenericEvent_AddMetadataWithTimes(IGNORED_PTR_ARG, EVENT_TRIGGERED_CATEGORY, CONNECTION_CREATION_NAME, EVENT_TYPE_SECURITY_VALUE, CONNECTION_CREATION_PAYLOAD_SCHEMA_VERSION, IGNORED_PTR_ARG)).SetReturn(EVENT_COLLECTOR_OK);
     STRICT_EXPECTED_CALL(JsonObjectWriter_Init(IGNORED_PTR_ARG)).SetReturn(JSON_WRITER_OK);
 
-    STRICT_EXPECTED_CALL(AuditSearch_ReadInt(IGNORED_PTR_ARG, "syscall", IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(AuditSearch_InterpretString(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG));
     saddrHex = hexInputString;
     STRICT_EXPECTED_CALL(AuditSearch_ReadString(IGNORED_PTR_ARG, "saddr", IGNORED_PTR_ARG));
 
@@ -247,23 +240,23 @@ void TestGetEvents_ExpectSuccess(char* hexInputString, char* ipAddress, char* po
     STRICT_EXPECTED_CALL(AuditSearch_SetCheckpoint(IGNORED_PTR_ARG)).SetReturn(AUDIT_SEARCH_OK);
     STRICT_EXPECTED_CALL(AuditSearch_Deinit(IGNORED_PTR_ARG)); 
 
-    EventCollectorResult result = ConnectionCreationEventCollector_GetEvents(&mockedQueue);
+    EventCollectorResult result = ConnectionCreateEventCollector_GetEvents(&mockedQueue);
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
     ASSERT_ARE_EQUAL(int, EVENT_COLLECTOR_OK, result);
 }
 
-TEST_FUNCTION(ConnectionCreationEventCollector_GetEventsWithInetConnection_ExpectSuccess)
+TEST_FUNCTION(ConnectionCreateEventCollector_GetEventsWithInetConnection_ExpectSuccess)
 {
     isAggregationEnabled = false;
     TestGetEvents_ExpectSuccess(hexInet, "192.168.50.241", "53");
 }
 
-TEST_FUNCTION(ConnectionCreationEventCollector_GetEventsWithInet6Connection_ExpectSuccess)
+TEST_FUNCTION(ConnectionCreateEventCollector_GetEventsWithInet6Connection_ExpectSuccess)
 {
     TestGetEvents_ExpectSuccess(hexInet6, "0000:0000:0000:0000:0000:0000:0000:0001", "55676");
 }
 
-TEST_FUNCTION(ConnectionCreationEventCollector_GetEventsWitUnknownConnection_AggregationDisabled_ExpectSuccess)
+TEST_FUNCTION(ConnectionCreateEventCollector_GetEventsWitUnknownConnection_AggregationDisabled_ExpectSuccess)
 {
     SyncQueue mockedQueue;
     isAggregationEnabled = false;
@@ -278,7 +271,7 @@ TEST_FUNCTION(ConnectionCreationEventCollector_GetEventsWitUnknownConnection_Agg
     STRICT_EXPECTED_CALL(GenericEvent_AddMetadataWithTimes(IGNORED_PTR_ARG, EVENT_TRIGGERED_CATEGORY, CONNECTION_CREATION_NAME, EVENT_TYPE_SECURITY_VALUE, CONNECTION_CREATION_PAYLOAD_SCHEMA_VERSION, IGNORED_PTR_ARG)).SetReturn(EVENT_COLLECTOR_OK);
     STRICT_EXPECTED_CALL(JsonObjectWriter_Init(IGNORED_PTR_ARG)).SetReturn(JSON_WRITER_OK);
 
-    STRICT_EXPECTED_CALL(AuditSearch_ReadInt(IGNORED_PTR_ARG, "syscall", IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(AuditSearch_InterpretString(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG));
     saddrHex = hexNonInet;
     STRICT_EXPECTED_CALL(AuditSearch_ReadString(IGNORED_PTR_ARG, "saddr", IGNORED_PTR_ARG));
 
@@ -287,12 +280,12 @@ TEST_FUNCTION(ConnectionCreationEventCollector_GetEventsWitUnknownConnection_Agg
     STRICT_EXPECTED_CALL(AuditSearch_SetCheckpoint(IGNORED_PTR_ARG)).SetReturn(AUDIT_SEARCH_OK);
     STRICT_EXPECTED_CALL(AuditSearch_Deinit(IGNORED_PTR_ARG)); 
 
-    EventCollectorResult result = ConnectionCreationEventCollector_GetEvents(&mockedQueue);
+    EventCollectorResult result = ConnectionCreateEventCollector_GetEvents(&mockedQueue);
     ASSERT_ARE_EQUAL(int, EVENT_COLLECTOR_OK, result);
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 }
 
-TEST_FUNCTION(ConnectionCreationEventCollector_GetEvents_AggregationDisabled_ExpectFailure)
+TEST_FUNCTION(ConnectionCreateEventCollector_GetEvents_AggregationDisabled_ExpectFailure)
 {
 
     SyncQueue mockedQueue;
@@ -311,7 +304,7 @@ TEST_FUNCTION(ConnectionCreationEventCollector_GetEvents_AggregationDisabled_Exp
 
     // if we fail in a single record, we still continue
     saddrHex = hexNonInet;
-    STRICT_EXPECTED_CALL(AuditSearch_ReadInt(IGNORED_PTR_ARG, "syscall", IGNORED_PTR_ARG)).SetFailReturn(EVENT_COLLECTOR_RECORD_HAS_ERRORS);
+    STRICT_EXPECTED_CALL(AuditSearch_InterpretString(IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG)).SetReturn(EVENT_COLLECTOR_RECORD_HAS_ERRORS);
 
     STRICT_EXPECTED_CALL(JsonArrayWriter_Init(IGNORED_PTR_ARG)).SetFailReturn(!JSON_WRITER_OK);
     STRICT_EXPECTED_CALL(JsonArrayWriter_AddObject(IGNORED_PTR_ARG, IGNORED_PTR_ARG)).SetFailReturn(!JSON_WRITER_OK);
@@ -336,7 +329,7 @@ TEST_FUNCTION(ConnectionCreationEventCollector_GetEvents_AggregationDisabled_Exp
             continue;
         }
 
-        EventCollectorResult result = ConnectionCreationEventCollector_GetEvents(&mockedQueue);
+        EventCollectorResult result = ConnectionCreateEventCollector_GetEvents(&mockedQueue);
         ASSERT_ARE_EQUAL(int, EVENT_COLLECTOR_EXCEPTION, result);
     }
     
@@ -344,18 +337,17 @@ TEST_FUNCTION(ConnectionCreationEventCollector_GetEvents_AggregationDisabled_Exp
 
 }
 
-TEST_FUNCTION(ConnectionCreationEventCollector_Init_ExpectSuccess)
+TEST_FUNCTION(ConnectionCreateEventCollector_Init_ExpectSuccess)
 {
     STRICT_EXPECTED_CALL(AuditControl_Init(IGNORED_PTR_ARG));
 
-    STRICT_EXPECTED_CALL(AuditControl_AddRule(IGNORED_PTR_ARG, IGNORED_PTR_ARG, 1, ARCHITECTURE_64, AUDIT_CONTROL_ON_SUCCESS_FILTER));
-    STRICT_EXPECTED_CALL(AuditControl_AddRule(IGNORED_PTR_ARG, IGNORED_PTR_ARG, 1, ARCHITECTURE_64, AUDIT_CONTROL_ON_SUCCESS_FILTER));
+    STRICT_EXPECTED_CALL(AuditControl_AddRule(IGNORED_PTR_ARG, IGNORED_PTR_ARG, 2, AUDIT_CONTROL_ON_SUCCESS_FILTER));
     STRICT_EXPECTED_CALL(EventAggregator_Init(IGNORED_PTR_ARG, IGNORED_PTR_ARG));
     STRICT_EXPECTED_CALL(AuditControl_Deinit(IGNORED_PTR_ARG));
 
-    EventCollectorResult result = ConnectionCreationEventCollector_Init();
+    EventCollectorResult result = ConnectionCreateEventCollector_Init();
     ASSERT_ARE_EQUAL(int, EVENT_COLLECTOR_OK, result);
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 }
 
-END_TEST_SUITE(connection_creation_collector_ut)
+END_TEST_SUITE(connection_create_collector_ut)

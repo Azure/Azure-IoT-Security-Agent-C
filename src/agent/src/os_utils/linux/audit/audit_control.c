@@ -3,11 +3,13 @@
 
 #include "os_utils/linux/audit/audit_control.h"
 #include "utils.h"
+#include "logger.h"
 
 #include <auparse.h>
 #include <libaudit.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/utsname.h>
 
 const char AUDIT_CONTROL_ON_SUCCESS_FILTER[] = "success=1";
 const char AUDIT_CONTROL_TYPE_EXECVE[] = "execve";
@@ -15,12 +17,14 @@ const char AUDIT_CONTROL_TYPE_EXECVEAT[] = "execveat";
 const char AUDIT_CONTROL_TYPE_CONNECT[] = "connect";
 const char AUDIT_CONTROL_TYPE_ACCEPT[] = "accept";
 
-/*
- * @brief Check whether the host is 64 bit os or not.
- *  
- * @return true if the host is 64 machine.
+/**
+ * @brief Construct a cpu archtiecture filter for auditctl in the format of: "arch=$(uname -m)".
+ * 
+ * @param   cpuArchitectureFilter   Out param. The result string.
+ * 
+ * @return true on success.
  */
-static bool is64BitMachine();
+static bool getCpuArchitectureFilter(char** cpuArchitectureFilter);
 
 AuditControlResultValues AuditControl_Init(AuditControl* auditControl) {
     AuditControlResultValues result = AUDIT_CONTROL_OK;
@@ -36,6 +40,12 @@ AuditControlResultValues AuditControl_Init(AuditControl* auditControl) {
 
     auditControl->audit = audit_open();
     if (auditControl->audit < 0) {
+        result = AUDIT_CONTROL_EXCEPTION;
+        goto cleanup;
+    }
+
+    if (!getCpuArchitectureFilter(&auditControl->cpuArchitectureFilter)) {
+        Logger_Error("Could not determine CPU architecture.");
         result = AUDIT_CONTROL_EXCEPTION;
         goto cleanup;
     }
@@ -56,9 +66,14 @@ void AuditControl_Deinit(AuditControl* auditControl) {
         ProcessInfoHandler_Reset(&auditControl->processInfo);
         auditControl->processInfoWasSet = false;
     }
+
+    if (auditControl->cpuArchitectureFilter != NULL) {
+        free(auditControl->cpuArchitectureFilter);
+        auditControl->cpuArchitectureFilter = NULL;
+    }
 }
 
-AuditControlResultValues AuditControl_AddRule(AuditControl* auditControl, const char** msgTypeArray, size_t msgTypeArraySize, Architecture architecture, const char* extraFilter) {
+AuditControlResultValues AuditControl_AddRule(AuditControl* auditControl, const char** msgTypeArray, size_t msgTypeArraySize, const char* extraFilter) {
     AuditControlResultValues result = AUDIT_CONTROL_OK;
     struct audit_rule_data* rule = NULL;
     char* msgTypeCopy = NULL;
@@ -69,18 +84,9 @@ AuditControlResultValues AuditControl_AddRule(AuditControl* auditControl, const 
 
     int flags = AUDIT_FILTER_EXIT & AUDIT_FILTER_MASK;
 
-    if (architecture == ARCHITECTURE_32) {
-        const char SUPPORT_32_BIT_FILTER[] = "arch=b32";
-        if (audit_rule_fieldpair_data(&rule, SUPPORT_32_BIT_FILTER, flags) != 0) { 
-            result = AUDIT_CONTROL_EXCEPTION;
-            goto cleanup;
-        }
-    } else if ((architecture == ARCHITECTURE_64) && is64BitMachine()) {
-        const char SUPPORT_64_BIT_FILTER[] = "arch=b64";
-        if (audit_rule_fieldpair_data(&rule, SUPPORT_64_BIT_FILTER, flags) != 0) { 
-            result = AUDIT_CONTROL_EXCEPTION;
-            goto cleanup;
-        }
+    if (audit_rule_fieldpair_data(&rule, auditControl->cpuArchitectureFilter, flags) != 0) { 
+        result = AUDIT_CONTROL_EXCEPTION;
+        goto cleanup;
     }
 
     for (int i=0; i<msgTypeArraySize; i++) {
@@ -126,7 +132,15 @@ cleanup:
     return result;
 }
 
-static bool is64BitMachine() {
-    long wordBits = sysconf(_SC_LONG_BIT);
-    return wordBits == 64;
+static bool getCpuArchitectureFilter(char** cpuArchitectureFilter) {
+    struct utsname utsnameBuffer = {0};
+    if (cpuArchitectureFilter == NULL) {
+        return false;
+    }
+
+    if (uname(&utsnameBuffer)) {
+        return false;
+    }
+
+    return (Utils_StringFormat("arch=%s", cpuArchitectureFilter, utsnameBuffer.machine) == ACTION_OK);
 }

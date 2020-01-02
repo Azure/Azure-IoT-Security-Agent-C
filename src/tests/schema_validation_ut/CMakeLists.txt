@@ -31,7 +31,7 @@ set(${theseTestsName}_c_files
     ../../agent/src/collectors/diagnostic_event_collector.c
     ../../agent/src/collectors/agent_telemetry_collector.c
     ../../agent/src/collectors/agent_configuration_error_collector.c
-    ../../agent/src/collectors/linux/connection_creation_collector.c
+    ../../agent/src/collectors/linux/connection_create_collector.c
     ../../agent/src/collectors/linux/generic_audit_event.c
     ../../agent/src/collectors/linux/user_login_collector.c
     ../../agent/src/collectors/linux/system_information_collector.c

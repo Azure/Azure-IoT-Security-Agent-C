@@ -7,6 +7,7 @@
 #include "umocktypes_bool.h"
 #include "umocktypes_charptr.h"
 #include "umock_c.h"
+#include "azure_c_shared_utility/map.h"
 
 #define ENABLE_MOCKS
 #include "json/json_array_reader.h"

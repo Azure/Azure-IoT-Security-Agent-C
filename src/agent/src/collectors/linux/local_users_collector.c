@@ -18,51 +18,51 @@
 
 /**
  * @brief Adds a list of all groups for a given user.
- * 
+ *
  * @param   usersIterator     The user iterator whos current user we want to use.
  * @param   parentObj         The parent object to which we want to add the new generated list.
- * 
+ *
  * @return true on success, false otherwise. In case of failure the parent object will be unchanged.
  */
 static bool LocalUsersCollector_AddGroupsForUser(UsersIteratorHandle usersIterator, JsonObjectWriterHandle parentObj);
 
 /**
  * @brief Adds a signel user to the given parent object.
- * 
+ *
  * @param   usersIterator     The user iterator whos current user we want to use.
  * @param   parentObj         The parent object to which we want to add the user.
- * 
+ *
  * @return true on success, false otherwise. In case of failure the parent object will be unchanged.
  */
 static bool LocalUsersCollector_AddSingleUser(UsersIteratorHandle usersIterator, JsonArrayWriterHandle parentObj);
 
 /**
  * @brief Calculates the size of the combined group ids and combined group names
- * 
+ *
  * @param   groupsIterator           The groups iterator to use.
  * @param   combinedGroupNamesSize   Out param. The final length needed for the combined group names.
  * @param   combinedGroupIdsSize     Out param. The final length needed for the combined group ids.
- * 
+ *
  * @return true on success, false otherwise.
  */
 static bool LocalUsersCollector_CalculateSizeOfGroups(GroupsIteratorHandle groupsIterator, uint32_t* combinedGroupNamesSize, uint32_t* combinedGroupIdsSize);
 
 /**
  * @brief Generates the string representing the groupNames and a string representing the groupIds.
- * 
+ *
  * @param   groupsIterator           The groups iterator to use.
  * @param   combinedGroupNames    Out param. Will contain the groupNames representation. Should b pre-allocated by the size returned from LocalUsersCollector_CalculateSizeOfGroups.
  * @param   combinedGroupIds      Out param. Will contain the groupIds representation. Should b pre-allocated by the size returned from LocalUsersCollector_CalculateSizeOfGroups.
- * 
+ *
  * @return true on success, false otherwise.
  */
 static bool LocalUsersCollector_GenerateGroupNamesAndIds(GroupsIteratorHandle groupsIterator, char* combinedGroupNames, char* combinedGroupIds);
 
 /**
  * @brief Apeend a value to the delimiter combined string
- * 
+ *
  * @param   combinedValue       The combined value.
- * @param   isFirst             Flag which indicates whether this is the first value. 
+ * @param   isFirst             Flag which indicates whether this is the first value.
  * @param   currentPosition     In-Out param. On input - poision to append the value to.
  *                              On output - the next available position in the combined string
  * @param   value               The value to append.
@@ -75,7 +75,7 @@ static void LocalUsersCollector_AppendValueName(char* combinedValue, bool isFirs
         memcpy(&combinedValue[*currentPosition], LOCAL_USERS_PAYLOAD_DELIMITER, delimiterLength);
         *currentPosition += delimiterLength;
     }
-    
+
     uint32_t currentValueSize = strlen(value);
     memcpy(&combinedValue[*currentPosition], value, currentValueSize);
     *currentPosition += currentValueSize;
@@ -129,15 +129,15 @@ static bool LocalUsersCollector_GenerateGroupNamesAndIds(GroupsIteratorHandle gr
 
         if (isFirst) {
            isFirst = false;
-        } 
+        }
     }
 
-        return true;
+    return true;
 }
 
-static bool LocalUsersCollector_AddGroupsForUser(UsersIteratorHandle usersIterator, JsonObjectWriterHandle parentObj) { 
+static bool LocalUsersCollector_AddGroupsForUser(UsersIteratorHandle usersIterator, JsonObjectWriterHandle parentObj) {
     bool success = true;
-    
+
     GroupsIteratorHandle groupsIterator = NULL;
     char* combinedGroupNames = NULL;
     char* combinedGroupIds = NULL;
@@ -151,10 +151,10 @@ static bool LocalUsersCollector_AddGroupsForUser(UsersIteratorHandle usersIterat
     uint32_t combinedGroupIdsSize = 0;
     if (!LocalUsersCollector_CalculateSizeOfGroups(groupsIterator, &combinedGroupNamesSize, &combinedGroupIdsSize)) {
         success = false;
-        goto cleanup;        
+        goto cleanup;
     }
     GroupsIterator_Reset(groupsIterator);
- 
+
     combinedGroupNames = malloc(combinedGroupNamesSize);
     if (combinedGroupNames == NULL) {
         success = false;
@@ -176,17 +176,17 @@ static bool LocalUsersCollector_AddGroupsForUser(UsersIteratorHandle usersIterat
 
     if (JsonObjectWriter_WriteString(parentObj, LOCAL_USERS_GROUP_NAMES_KEY, combinedGroupNames) != JSON_WRITER_OK) {
         success = false;
-        goto cleanup;  
+        goto cleanup;
     }
 
     if (JsonObjectWriter_WriteString(parentObj, LOCAL_USERS_GROUP_IDS_KEY, combinedGroupIds) != JSON_WRITER_OK) {
         success = false;
-        goto cleanup;  
+        goto cleanup;
     }
 
 cleanup:
     if (groupsIterator != NULL) {
-        GroupsIterator_Deinit(groupsIterator);   
+        GroupsIterator_Deinit(groupsIterator);
     }
 
     if (combinedGroupIds != NULL) {
@@ -214,7 +214,7 @@ static bool LocalUsersCollector_AddSingleUser(UsersIteratorHandle usersIterator,
         goto cleanup;
     }
 
-    char userIdStr[11] = {0};
+    char userIdStr[33] = {0};
     int32_t userIdStrSize = sizeof(userIdStr);
     if(UsersIterator_GetUserId(usersIterator, userIdStr, &userIdStrSize) != USER_ITERATOR_OK)
     {
@@ -225,7 +225,7 @@ static bool LocalUsersCollector_AddSingleUser(UsersIteratorHandle usersIterator,
     if (JsonObjectWriter_WriteString(userObject, LOCAL_USERS_USER_ID_KEY, userIdStr) != JSON_WRITER_OK) {
         success = false;
         goto cleanup;
-    }   
+    }
 
     if (!LocalUsersCollector_AddGroupsForUser(usersIterator, userObject)) {
         Logger_Debug("Failed adding groups for user %s.", UsersIterator_GetUsername(usersIterator));
@@ -241,12 +241,12 @@ cleanup:
     if (userObject != NULL) {
         JsonObjectWriter_Deinit(userObject);
     }
-    
+
     return success;
 }
 
 EventCollectorResult LocalUsersCollector_GetEvents(SyncQueue* queue) {
-    
+
     EventCollectorResult result = EVENT_COLLECTOR_OK;
     JsonObjectWriterHandle usersEventWriter = NULL;
     UsersIteratorHandle usersIterator = NULL;
@@ -267,7 +267,7 @@ EventCollectorResult LocalUsersCollector_GetEvents(SyncQueue* queue) {
         result = EVENT_COLLECTOR_EXCEPTION;
         goto cleanup;
     }
-    
+
     if (UsersIterator_Init(&usersIterator) != USER_ITERATOR_OK) {
         result = EVENT_COLLECTOR_EXCEPTION;
         goto cleanup;
@@ -309,7 +309,7 @@ cleanup:
             free(messageBuffer);
         }
     }
-    
+
     if (usersIterator != NULL) {
         UsersIterator_Deinit(usersIterator);
     }
@@ -317,7 +317,7 @@ cleanup:
     if (usersPayloadArray != NULL) {
         JsonArrayWriter_Deinit(usersPayloadArray);
     }
-    
+
     if (usersEventWriter != NULL) {
         JsonObjectWriter_Deinit(usersEventWriter);
     }

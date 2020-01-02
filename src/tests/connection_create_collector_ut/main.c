@@ -6,6 +6,6 @@
 int main(void)
 {
     size_t failedTestCount = 0;
-    RUN_TEST_SUITE(connection_creation_collector_ut, failedTestCount);
+    RUN_TEST_SUITE(connection_create_collector_ut, failedTestCount);
     return failedTestCount;
 }

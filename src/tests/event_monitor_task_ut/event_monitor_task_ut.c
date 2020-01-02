@@ -10,7 +10,7 @@
 #define ENABLE_MOCKS
 #include "collectors/agent_configuration_error_collector.h"
 #include "collectors/agent_telemetry_collector.h"
-#include "collectors/connection_creation_collector.h"
+#include "collectors/connection_create_collector.h"
 #include "collectors/diagnostic_event_collector.h"
 #include "collectors/firewall_collector.h"
 #include "collectors/linux/baseline_collector.h"
@@ -109,7 +109,7 @@ TEST_FUNCTION(EventMonitorTask_Init_ExpectSuccess)
 
     // init collectors
     STRICT_EXPECTED_CALL(ProcessCreationCollector_Init());
-    STRICT_EXPECTED_CALL(ConnectionCreationEventCollector_Init());
+    STRICT_EXPECTED_CALL(ConnectionCreateEventCollector_Init());
     bool result = EventMonitorTask_Init(&task, &highPriorityQueue, &lowPriorityQueue, &operationalEventsQueue);
     ASSERT_IS_TRUE(result);
 
@@ -131,7 +131,7 @@ TEST_FUNCTION(EventMonitorTask_Deinit_ExpectSuccess)
 
     // init collectors
     STRICT_EXPECTED_CALL(ProcessCreationCollector_Init());
-    STRICT_EXPECTED_CALL(ConnectionCreationEventCollector_Init());
+    STRICT_EXPECTED_CALL(ConnectionCreateEventCollector_Init());
     bool result = EventMonitorTask_Init(&task, &highPriorityQueue, &lowPriorityQueue, &operationalEventsQueue);
     ASSERT_IS_TRUE(result);
 
@@ -150,7 +150,7 @@ TEST_FUNCTION(EventMonitorTask_ExecuteGetSnapshotFrequencyFailed_ExpectSuccess)
 
     // init collectors
     STRICT_EXPECTED_CALL(ProcessCreationCollector_Init());
-    STRICT_EXPECTED_CALL(ConnectionCreationEventCollector_Init());
+    STRICT_EXPECTED_CALL(ConnectionCreateEventCollector_Init());
     bool result = EventMonitorTask_Init(&task, &highPriorityQueue, &lowPriorityQueue, &operationalEventsQueue);
     ASSERT_IS_TRUE(result);
 
@@ -172,7 +172,7 @@ TEST_FUNCTION(EventMonitorTask_ExecuteTimeoutDidNotPass_ExpectSuccess)
 
     // init collectors
     STRICT_EXPECTED_CALL(ProcessCreationCollector_Init());
-    STRICT_EXPECTED_CALL(ConnectionCreationEventCollector_Init());
+    STRICT_EXPECTED_CALL(ConnectionCreateEventCollector_Init());
     bool result = EventMonitorTask_Init(&task, &highPriorityQueue, &lowPriorityQueue, &operationalEventsQueue);
     ASSERT_IS_TRUE(result);
 
@@ -200,7 +200,7 @@ TEST_FUNCTION(EventMonitorTask_ExecuteSnapshotTimeout_ExpectSuccess)
 
     // init collectors
     STRICT_EXPECTED_CALL(ProcessCreationCollector_Init());
-    STRICT_EXPECTED_CALL(ConnectionCreationEventCollector_Init());
+    STRICT_EXPECTED_CALL(ConnectionCreateEventCollector_Init());
     bool result = EventMonitorTask_Init(&task, &highPriorityQueue, &lowPriorityQueue, &operationalEventsQueue);
     ASSERT_IS_TRUE(result);
 
@@ -252,7 +252,7 @@ TEST_FUNCTION(EventMonitorTask_ExecuteTriggeredTimeout_ExpectSuccess)
 
     // init collectors
     STRICT_EXPECTED_CALL(ProcessCreationCollector_Init());
-    STRICT_EXPECTED_CALL(ConnectionCreationEventCollector_Init());
+    STRICT_EXPECTED_CALL(ConnectionCreateEventCollector_Init());
     bool result = EventMonitorTask_Init(&task, &highPriorityQueue, &lowPriorityQueue, &operationalEventsQueue);
     ASSERT_IS_TRUE(result);
 
@@ -276,7 +276,7 @@ TEST_FUNCTION(EventMonitorTask_ExecuteTriggeredTimeout_ExpectSuccess)
     STRICT_EXPECTED_CALL(UserLoginCollector_GetEvents(&highPriorityQueue));
 
     STRICT_EXPECTED_CALL(TwinConfigurationEventCollectors_GetPriority(EVENT_TYPE_CONNECTION_CREATE, IGNORED_PTR_ARG));
-    STRICT_EXPECTED_CALL(ConnectionCreationEventCollector_GetEvents(&highPriorityQueue));
+    STRICT_EXPECTED_CALL(ConnectionCreateEventCollector_GetEvents(&highPriorityQueue));
 
     STRICT_EXPECTED_CALL(TwinConfigurationEventCollectors_GetPriority(EVENT_TYPE_DIAGNOSTIC, IGNORED_PTR_ARG));
     STRICT_EXPECTED_CALL(DiagnosticEventCollector_GetEvents(&highPriorityQueue));

@@ -133,4 +133,16 @@ MOCKABLE_FUNCTION(, bool, JsonObjectWriter_Compare, JsonObjectWriterHandle, a, J
  */
 MOCKABLE_FUNCTION(, JsonWriterResult, JsonObjectWriter_GetSize, JsonObjectWriterHandle, handle, uint32_t*, size);
 
+/**
+ * @brief Sets the new root of the json writer to be the given key.
+ * 
+ * @param   handle  Out param. The handle to use for the json writer operations.
+ * @param   key     The key to set the root.
+ * 
+ * @return JSON_WRITER_OK on success, an indicative error in failure. The state of the writer will be the same in case of error.
+ */
+MOCKABLE_FUNCTION(, JsonWriterResult, JsonObjectWriter_StepIn, JsonObjectWriterHandle, handle, const char*, key);
+
+
+
 #endif //JSON_OBJECT_WRITER_H

@@ -9,7 +9,6 @@
 #include "umocktypes_charptr.h"
 #include "umocktypes_bool.h"
 
-#include "azure_c_shared_utility/map.h"
 #include "agent_telemetry_counters.h"
 #include "schema_utils.h"
 #include "twin_configuration.h"
@@ -19,11 +18,12 @@
 #include "collectors/diagnostic_event_collector.h"
 #include "collectors/system_information_collector.h"
 #include "collectors/agent_configuration_error_collector.h"
-#include "collectors/connection_creation_collector.h"
+#include "collectors/connection_create_collector.h"
 #include "collectors/firewall_collector.h"
 #include "collectors/local_users_collector.h"
 #include "collectors/process_creation_collector.h"
 #include "collectors/event_aggregator.h"
+#include "azure_c_shared_utility/map.h"
 
 #define ENABLE_MOCKS
 #include "twin_configuration_event_collectors.h"
@@ -220,7 +220,13 @@ TEST_FUNCTION(SchemaValidation_ConfigurationError)
 
 AuditSearchResultValues MockAuditSearch_InterpretString(AuditSearch* auditSearch, const char* fieldName, const char** output) 
 {
-    *output = "inet host:1.2.3.4 serv:5";
+    if (strcmp(fieldName, "syscall") == 0) {
+        *output = "connect";
+    } else if (strcmp(fieldName, "hash") == 0){
+        return 0;
+    } else {
+        *output = "inet host:1.2.3.4 serv:5";
+    }
     return 0;
 }
 
@@ -235,12 +241,6 @@ AuditSearchResultValues MockAuditSearch_ReadString(AuditSearch* auditSearch, con
     else
         *output = "something";
 
-    return 0;
-}
-
-AuditSearchResultValues MockAuditSearch_ReadInt(AuditSearch* auditSearch, const char* fieldName, int* output) 
-{
-    *output = 42;
     return 0;
 }
 
@@ -259,7 +259,6 @@ TEST_FUNCTION(SchemaValidation_UserLogin)
 
     REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_InterpretString, MockAuditSearch_InterpretString);
     REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_ReadString, MockAuditSearch_ReadString);
-    REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_ReadInt, MockAuditSearch_ReadInt);
 
     STRICT_EXPECTED_CALL(AuditSearch_GetNext(IGNORED_PTR_ARG)).SetReturn(AUDIT_SEARCH_NO_MORE_DATA);
 
@@ -269,7 +268,6 @@ TEST_FUNCTION(SchemaValidation_UserLogin)
 
     REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_InterpretString, NULL);
     REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_ReadString, NULL);
-    REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_ReadInt, NULL);
 
     ASSERT_ARE_EQUAL(int, SCHEMA_VALIDATION_OK, validate_schema(&queue));
 
@@ -287,15 +285,13 @@ TEST_FUNCTION(SchemaValidation_ConnectionCreation)
 
     REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_InterpretString, MockAuditSearch_InterpretString);
     REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_ReadString, MockAuditSearch_ReadString);
-    REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_ReadInt, MockAuditSearch_ReadInt);
 
     SyncQueue queue;
     ASSERT_ARE_EQUAL(int, QUEUE_OK, SyncQueue_Init(&queue, false));
-    ASSERT_ARE_EQUAL(int, EVENT_COLLECTOR_OK, ConnectionCreationEventCollector_GetEvents(&queue));
+    ASSERT_ARE_EQUAL(int, EVENT_COLLECTOR_OK, ConnectionCreateEventCollector_GetEvents(&queue));
 
     REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_InterpretString, NULL);
     REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_ReadString, NULL);
-    REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_ReadInt, NULL);
 
 
     ASSERT_ARE_EQUAL(int, SCHEMA_VALIDATION_OK, validate_schema(&queue));
@@ -485,7 +481,7 @@ TEST_FUNCTION(SchemaValidation_ProcessCreation)
     REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_GetNext, MockAuditSearch_GetNext);
     REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_InterpretString, MockAuditSearch_InterpretString);
     REGISTER_GLOBAL_MOCK_HOOK(AuditSearch_ReadString, MockAuditSearch_ReadString);
-    
+       
     SyncQueue queue;
     ASSERT_ARE_EQUAL(int, QUEUE_OK, SyncQueue_Init(&queue, false));
     ASSERT_ARE_EQUAL(int, EVENT_COLLECTOR_OK, ProcessCreationCollector_GetEvents(&queue));

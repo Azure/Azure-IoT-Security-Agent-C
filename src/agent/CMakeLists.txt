@@ -97,7 +97,7 @@ set(agent_collectors_c_file
     ./src/collectors/diagnostic_event_collector.c
     ./src/collectors/event_aggregator.c
     ./src/collectors/linux/baseline_collector.c
-    ./src/collectors/linux/connection_creation_collector.c
+    ./src/collectors/linux/connection_create_collector.c
     ./src/collectors/linux/firewall_collector.c
     ./src/collectors/linux/generic_audit_event.c
     ./src/collectors/linux/generic_event.c
@@ -111,7 +111,7 @@ set(agent_collectors_c_file
 set(agent_collectors_h_file
     ./inc/collectors/agent_configuration_error_collector.h
     ./inc/collectors/agent_telemetry_collector.h
-    ./inc/collectors/connection_creation_collector.h
+    ./inc/collectors/connection_create_collector.h
     ./inc/collectors/diagnostic_event_collector.h
     ./inc/collectors/event_aggregator.h
     ./inc/collectors/firewall_collector.h

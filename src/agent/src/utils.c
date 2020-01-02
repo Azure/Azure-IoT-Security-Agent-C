@@ -153,6 +153,32 @@ bool Utils_CreateStringCopy(char** newCopy, const char* src) {
     return true;
 }
 
+
+bool Utils_Substring(const char* src, char** dest, uint32_t startOffset, uint32_t endOffset){
+    if (src == NULL || dest == NULL || startOffset < 0 || endOffset < 0){
+        return false;
+    }
+    uint32_t len = strlen(src);
+    if (startOffset >= len || endOffset >= len || (startOffset + endOffset) >= len) {
+        return false;
+    }
+    uint32_t size = 0;
+    size = len - startOffset - endOffset + 1;
+
+    *dest = malloc(size * sizeof(char));
+    if (*dest == NULL) {
+        return false;
+    }
+    int i=startOffset,j=0;
+    char* s = *dest;
+    for(; j < size -1 ; i++,j++){
+        s[j] = src[i];
+    }
+
+    s[size-1] = '\0';
+    return true;
+}
+
 bool Utils_AddUnsignedIntsWithOverflowCheck(uint32_t* result, uint32_t a, uint32_t b) {
     if (a > UINT32_MAX - b) {
         return false;
@@ -242,4 +268,14 @@ cleanup:
     }
 
     return result;
+}
+
+bool Utils_GetMapSize(MAP_HANDLE handle, size_t* size){
+    const char*const* keys;
+    const char*const* values;
+    if (Map_GetInternals(handle, &keys, &values, size) != MAP_OK){
+        return false;
+    }
+
+    return true;
 }

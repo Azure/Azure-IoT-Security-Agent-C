@@ -9,7 +9,7 @@
 #include "collectors/agent_configuration_error_collector.h"
 #include "collectors/agent_telemetry_collector.h"
 #include "collectors/collector.h"
-#include "collectors/connection_creation_collector.h"
+#include "collectors/connection_create_collector.h"
 #include "collectors/diagnostic_event_collector.h"
 #include "collectors/firewall_collector.h"
 #include "collectors/linux/baseline_collector.h"
@@ -162,8 +162,8 @@ static bool EventMonitorTask_MonitorTriggeredEvents(EventMonitorTask* task) {
         return false;
     }
 
-    Logger_Debug("Collect connction create.");
-    if (!EventMonitorTask_MonitorSingleEvents(task, EVENT_TYPE_CONNECTION_CREATE, ConnectionCreationEventCollector_GetEvents)) {
+    Logger_Debug("Collect connection create.");
+    if (!EventMonitorTask_MonitorSingleEvents(task, EVENT_TYPE_CONNECTION_CREATE, ConnectionCreateEventCollector_GetEvents)) {
         return false;
     }
 
@@ -203,7 +203,7 @@ bool EventMonitorTask_InitCollectors() {
         return false;
     }
 
-    if (ConnectionCreationEventCollector_Init() != EVENT_COLLECTOR_OK) {
+    if (ConnectionCreateEventCollector_Init() != EVENT_COLLECTOR_OK) {
         return false;
     }
 
@@ -212,5 +212,5 @@ bool EventMonitorTask_InitCollectors() {
 
 void EventMonitorTask_DeinitCollectors() {
     ProcessCreationCollector_Deinit();
-    ConnectionCreationEventCollector_Deinit();
+    ConnectionCreateEventCollector_Deinit();
 }
