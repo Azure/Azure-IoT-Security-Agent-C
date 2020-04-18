@@ -143,7 +143,7 @@ installagent()
     sed -e "s|{DIRECTORY}|$_targetDirectory|g" -e "s|{EXE}|$_execName|g" -e "s|{USER}|$_userName|g" -e "s|{GROUP}|$_userName|g" $_serviceTemplateName > $_targetDirectory/$_serviceTemplateName
 
     #link the service file to the system service files location
-    ln -s $_systemServiceFileLocation/$_serviceTemplateName
+    ln -s $_targetDirectory/$_serviceTemplateName $_systemServiceFileLocation/$_serviceTemplateName 
 
     #reload the deamon, in case is was already installed before
     systemctl daemon-reload
